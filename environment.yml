@@ -1,0 +1,23 @@
+name: cfd_rom_env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - numpy
+  - scipy
+  - pandas
+  - xarray
+  - netCDF4
+  - h5netcdf
+  - dask
+  - matplotlib
+  - pyvista
+  - trimesh
+  - fsspec
+  - aiohttp
+  - ipykernel  # So you can use this env in Jupyter Notebooks
+  - scikit-learn
+
+  # run the following when in the right path to install the environment:
+  # conda env create -f environment.yml
