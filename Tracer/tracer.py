@@ -1,6 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
-
 
 def norm(arr):
     """Returns the Euclidean norm: sqrt(sum(x_i^2))"""
@@ -12,13 +10,18 @@ def initial_velocity(speed, angle):
     V0 = speed * np.array([0, np.cos(theta), np.sin(theta)])
     return V0
 
+def rpm2radps(rpm):
+    """Converts revolutions per minute to radians per second"""
+    return rpm * 2 * np.pi / 60
+
 def acc(V, W, wind, r, m, vc, vs, g, rho):
     pi = np.pi
     cd = drag_coefficient(norm(V), norm(W), r, vc, vs)
     cl = 1.7
 
     a = -1/(2*m) * cd * pi * r**2 * rho * norm(V-wind) * (V-wind) \
-        + cl/m * pi * r**3 * rho * np.cross(W, V)
+        + 1/(2*m) * cl * pi * r**2 * rho * np.cross(W, (V-wind)) / norm(np.cross(W, (V-wind))) # The "Standard Aerodynamic" Model
+        #+ cl/m * pi * r**3 * rho * np.cross(W, (V-wind)) Mencke et al. 2020 found that the lift force is proportional to the cross product of the spin and the relative velocity, which is what we have here. The lift coefficient is set to 1.7 based on their findings for golf balls.
     
     a[2] += g # add gravity in the z direction
 
@@ -34,12 +37,14 @@ def drag_coefficient(v, w, r, vc, vs): # Based on Mencke et al. 2020
     else: 
         return 0.2 + 0.346 / (1 + np.exp((v - vc) / vs))
 
-def fetch_wind_data(wind):
+def fetch_wind_data(wind, randomize):
     # This function will fetch the wind data from an API or a file
     # For now, we will just return a dummy wind vector
-    return wind 
+    if randomize:
+        wind = wind + np.random.normal(0, 0.5, 3)  # Add some random noise
+    return wind
 
-def solver(P0, V0, W0, wind, vc=33, vs=5, r=0.0214, m=0.046, g=-9.81, rho=1.2, dt=0.01):
+def solver(P0, V0, W0, wind, vc=33, vs=5, r=0.0214, m=0.046, g=-9.81, rho=1.2, dt=0.01, randomize_wind=False):
     # This function will solve the equations of motion for the ball given the initial conditions and parameters
     # It will return the trajectory of the ball as a function of time
     t = np.array([0]) # time array starting at 0
@@ -47,9 +52,9 @@ def solver(P0, V0, W0, wind, vc=33, vs=5, r=0.0214, m=0.046, g=-9.81, rho=1.2, d
     V = np.array([V0]) # initial velocity
     W = np.array([W0]) # initial angular velocity
     while P[-1][2]>=0: # integrate until the ball hits the ground
-        print(f"Time: {t[-1]:.2f} s, Position: {P[-1]}, Velocity: {V[-1]}, Spin: {W[-1]}", end='\r', flush=True)
+        #print(f"Time: {t[-1]:.2f} s, Position: {P[-1]}, Velocity: {V[-1]}, Spin: {W[-1]}", end=" \r")
         t = np.append(t, t[-1] + dt)
-        a = acc(V[-1], W[-1], fetch_wind_data(wind), r, m, vc, vs, g, rho)
+        a = acc(V[-1], W[-1], fetch_wind_data(wind, randomize=randomize_wind), r, m, vc, vs, g, rho)
         V = np.append(V, [V[-1] + a * dt], axis=0)
         P = np.append(P, [P[-1] + V[-1] * dt], axis=0)
 

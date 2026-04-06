@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from tracer import initial_velocity, solver
+from tracer import initial_velocity, solver, rpm2radps
 
 
 def plot_trajectory(P0, V0, W0, wind):
@@ -40,8 +40,8 @@ if __name__ == "__main__":
     # This is where we will run our simulation and plot the results
     # We can change the initial conditions and parameters here to see how they affect the trajectory of the ball
     P0 = [0,0,0]
-    V0 = initial_velocity(speed=50, angle=65) 
-    W0 = np.array([0, 0, 100])
-    wind = np.array([-2, -2, 10]) # 
+    V0 = initial_velocity(speed=48, angle=20) 
+    W0 = np.array([rpm2radps(8647), 0, 0])
+    wind = np.array([8, 3, 6]) # 
 
     plot_trajectory(P0, V0, W0, wind)
