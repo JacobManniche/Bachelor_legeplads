@@ -60,3 +60,21 @@ def solver(P0, V0, W0, wind, vc=33, vs=5, r=0.0214, m=0.046, g=-9.81, rho=1.2, d
 
     return t, P
 
+# %% Updated functions with theory from Wind Dispersion Model pdf from Trackman, moving from W1 to W3
+
+def acc_updated(V, w, wind_mean, eta, r, m, g, rho):
+    """
+    V: ball velocity vector [vx, vy, vz]
+    w: spin vector [wx, wy, wz] (Omega in PDF)
+    wind_mean: mean wind vector from RANS [ux, uy, uz]
+    eta: current stochastic wind perturbation vector
+    """
+
+    # 1. Calculate total seen wind and relative velocity (Section 2)
+    U_seen = wind_mean + eta 
+    u_vec = V - U_seen 
+    u_mag = max(norm(u_vec), 0.1) # Floor to avoid division by zero ()
+
+    
+
+
