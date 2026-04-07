@@ -84,3 +84,4 @@ def solver(P0, V0, W0, wind, dt=0.01, max_time=15):
             t = t[:i+1]
             break
     return t, P
+
