@@ -1,7 +1,7 @@
 import numpy as np
 
 class WindField:
-    def __init__(self, nx, ny, nz, profile="log", U_ref=10.0, z_ref=10.0, z0=0.1):
+    def __init__(self, nx, ny, nz, profile="log", U_ref=10.0, z0=0.1):
         """
         nx, ny, nz : int
             Grid size in x, y, z directions
@@ -37,7 +37,9 @@ class WindField:
         if profile == "uniform":
             U = np.full((nx, ny, nz), U_ref, dtype=np.float32)
         elif profile == "log":
-            U = U_ref * (u_star / kappa) / np.log(z_ref / z0)
+            # Avoid log(0) by ensuring z > z0
+            Z_safe = np.maximum(Z, z0 + 1e-6)
+            U = (u_star / kappa) * np.log(Z_safe / z0)
         else:
             raise ValueError("Unsupported profile type. Use 'uniform' or 'log'.")
         
