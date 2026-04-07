@@ -1,4 +1,5 @@
 import numpy as np
+from windfield import WindField
 
 def norm(arr):
     """Returns the Euclidean norm: sqrt(sum(x_i^2))"""
@@ -10,14 +11,16 @@ def initial_velocity(speed, angle):
     V0 = speed * np.array([0, np.cos(theta), np.sin(theta)])
     return V0
 
-def acc(V, W, wind):
+# Constants for acceleration calculations
+r=0.0214; m=0.046; rho=1.2; g=9.81 # inverse mass for efficiency
+A = np.pi * r**2 # cross-sectional area of the ball
+constant_property = A * rho/(2 * m) # constant property for efficiency
+G = -g * np.array([0, 0, 1]) # gravity vector
 
-    # Constants
-    r=0.0214; m_inv=21.7; rho=1.2; g=9.81 # inverse mass for efficiency
+def acc(V, W, wind):
 
     # Computations
     U = V - wind # relative velocity of the ball with respect to the air
-    A = np.pi * r**2 # cross-sectional area of the ball
     U_mag = norm(U)
     UW_cross = np.cross(W, U)
     UW_cross_norm = norm(UW_cross)
@@ -25,13 +28,11 @@ def acc(V, W, wind):
     cd, cl = coefficients(U_mag, norm(W), r) # get drag and lift coefficients based on current conditions
 
     # Aerodynamic forces
-    D = -.5 * m_inv * cd * A * rho * U_mag * U
+    D = -constant_property * cd * U_mag * U
     if UW_cross_norm > 0:
-        L = .5 * m_inv * cl * A * rho * U_mag**2 * UW_cross / norm(UW_cross) # The "Standard Aerodynamic" Model
+        L = constant_property * cl * U_mag**2 * UW_cross / norm(UW_cross) # The "Standard Aerodynamic" Model
     else:
-        L = np.array([0, 0, 0])
-
-    G = -g * np.array([0, 0, 1]) # gravity vector
+        L = np.array([0, 0, 0]) # No lift if there is no spin or relative velocity
 
     a = D + L + G # acceleration from Newton's second law
 
@@ -57,31 +58,24 @@ def coefficients(v, w, r):
     cl =  0.1 + 0.5 * s
     return cd, cl
 
-def fetch_wind_data(wind):
+def fetch_wind_data(wind: WindField, x, y, z):
     # This function will fetch the wind data from an API or a file
     # For now, we will just return a dummy wind vector
-    return wind
+    x = int(np.clip(x, 0, wind.nx-1))
+    y = int(np.clip(y, 0, wind.ny-1))
+    z = int(np.clip(z, 0, wind.nz-1))
+    return wind.get_point(x, y, z)['velocity']
 
-def solver(P0, V0, W0, wind, dt=0.01, max_time=15):
+def solver(P0, V0, W0, wind: WindField, dt=0.01):
     # This function will solve the equations of motion for the ball given the initial conditions and parameters
     # It will return the trajectory of the ball as a function of time
-    max_steps = int(max_time / dt)
-    
-    t = np.arange(0, max_time, dt) # time array starting at 0
-    P = np.zeros((max_steps, 3)) # position array
-    V = np.zeros((max_steps, 3)) # velocity array
-    W = np.zeros((max_steps, 3)) # initial angular velocity (rpm2radps)
-    P[0] = P0
-    V[0] = V0
-    W[0] = W0 * 2*np.pi/60  # Convert rpm to rad/s
-    for i in range(1, max_steps):
-        a = acc(V[i-1], W[i-1], fetch_wind_data(wind))
-        V[i] = V[i-1] + a * dt
-        P[i] = P[i-1] + V[i-1] * dt
-        W[i] = W[i-1]*np.exp(-5e-4*dt)  # Assuming 4% spin decay every second (4%/60 = 5e-4)
-        if P[i][2] < 0: # Stop if the ball hits the ground
-            P = P[:i+1]
-            t = t[:i+1]
-            break
-    return t, P
-
+    t = [0]
+    P = [P0] # position array
+    V = [V0]
+    W = [W0 * 2*np.pi/60] # initial angular velocity (rpm2radps)
+    while P[-1][2] >= 0: # while the ball is above the ground
+        V.append(V[-1] + acc(V[-1], W[-1], fetch_wind_data(wind, *P[-1])) * dt)
+        P.append(P[-1] + V[-1] * dt)
+        W.append(W[-1]*np.exp(-5e-4*dt))  # Assuming 4% spin decay every second (4%/60 = 5e-4)
+        t.append(t[-1] + dt)
+    return np.array(t), np.array(P)
