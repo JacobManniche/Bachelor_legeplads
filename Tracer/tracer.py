@@ -10,52 +10,77 @@ def initial_velocity(speed, angle):
     V0 = speed * np.array([0, np.cos(theta), np.sin(theta)])
     return V0
 
-def rpm2radps(rpm):
-    """Converts revolutions per minute to radians per second"""
-    return rpm * 2 * np.pi / 60
+def acc(V, W, wind):
 
-def acc(V, W, wind, r, m, vc, vs, g, rho):
-    pi = np.pi
-    cd = drag_coefficient(norm(V), norm(W), r, vc, vs)
-    cl = 1.7
+    # Constants
+    r=0.0214; m_inv=21.7; rho=1.2; g=9.81 # inverse mass for efficiency
 
-    a = -1/(2*m) * cd * pi * r**2 * rho * norm(V-wind) * (V-wind) \
-        + 1/(2*m) * cl * pi * r**2 * rho * np.cross(W, (V-wind)) / norm(np.cross(W, (V-wind))) # The "Standard Aerodynamic" Model
-        #+ cl/m * pi * r**3 * rho * np.cross(W, (V-wind)) Mencke et al. 2020 found that the lift force is proportional to the cross product of the spin and the relative velocity, which is what we have here. The lift coefficient is set to 1.7 based on their findings for golf balls.
+    # Computations
+    U = V - wind # relative velocity of the ball with respect to the air
+    A = np.pi * r**2 # cross-sectional area of the ball
+    U_mag = norm(U)
+    UW_cross = np.cross(W, U)
+    UW_cross_norm = norm(UW_cross)
     
-    a[2] += g # add gravity in the z direction
+    cd, cl = coefficients(U_mag, norm(W), r) # get drag and lift coefficients based on current conditions
+
+    # Aerodynamic forces
+    D = -.5 * m_inv * cd * A * rho * U_mag * U
+    if UW_cross_norm > 0:
+        L = .5 * m_inv * cl * A * rho * U_mag**2 * UW_cross / norm(UW_cross) # The "Standard Aerodynamic" Model
+    else:
+        L = np.array([0, 0, 0])
+
+    G = -g * np.array([0, 0, 1]) # gravity vector
+
+    a = D + L + G # acceleration from Newton's second law
 
     return a
 
-def spin_ratio(w, r, v):
-    return w * r / v
+def coefficients(v, w, r):
+    ## TODO add more realistic models for the drag and lift coefficients
 
-def drag_coefficient(v, w, r, vc, vs): # Based on Mencke et al. 2020
-    s = spin_ratio(w, r, v)
-    if s>0.05 and v>vc: # at high spin ratios and high velocities, the drag coefficient increases with spin ratio
-        return 0.4127*s**0.3056
-    else: 
-        return 0.2 + 0.346 / (1 + np.exp((v - vc) / vs))
+    re = (1.2 * v * (2*r)) / 1.78e-5 # Reynolds Number calculation
+    s = (w * r) / v                   # Spin Ratio
+    
+    # Baseline Drag based on Reynolds (simplified transition)
+    if re < 40000:
+        cd_base = 0.5
+    elif re < 150000:
+        # Linear drop during drag crisis
+        cd_base = 0.5 - 0.28 * ((re - 40000) / 110000)
+    else:
+        cd_base = 0.22
+        
+    # Add Spin-Induced Drag (Mencke/Lieberman logic)
+    cd = cd_base + 0.3 * (s**2)
+    cl =  0.1 + 0.5 * s
+    return cd, cl
 
-def fetch_wind_data(wind, randomize):
+def fetch_wind_data(wind):
     # This function will fetch the wind data from an API or a file
     # For now, we will just return a dummy wind vector
-    if randomize:
-        wind = wind + np.random.normal(0, 0.5, 3)  # Add some random noise
     return wind
 
-def solver(P0, V0, W0, wind, vc=33, vs=5, r=0.0214, m=0.046, g=-9.81, rho=1.2, dt=0.01, randomize_wind=False):
+def solver(P0, V0, W0, wind, dt=0.01, max_time=15):
     # This function will solve the equations of motion for the ball given the initial conditions and parameters
     # It will return the trajectory of the ball as a function of time
-    t = np.array([0]) # time array starting at 0
-    P = np.array([P0]) # initial position
-    V = np.array([V0]) # initial velocity
-    W = np.array([W0]) # initial angular velocity
-    while P[-1][2]>=0: # integrate until the ball hits the ground
-        #print(f"Time: {t[-1]:.2f} s, Position: {P[-1]}, Velocity: {V[-1]}, Spin: {W[-1]}", end=" \r")
-        t = np.append(t, t[-1] + dt)
-        a = acc(V[-1], W[-1], fetch_wind_data(wind, randomize=randomize_wind), r, m, vc, vs, g, rho)
-        V = np.append(V, [V[-1] + a * dt], axis=0)
-        P = np.append(P, [P[-1] + V[-1] * dt], axis=0)
-
+    max_steps = int(max_time / dt)
+    
+    t = np.arange(0, max_time, dt) # time array starting at 0
+    P = np.zeros((max_steps, 3)) # position array
+    V = np.zeros((max_steps, 3)) # velocity array
+    W = np.zeros((max_steps, 3)) # initial angular velocity (rpm2radps)
+    P[0] = P0
+    V[0] = V0
+    W[0] = W0 * 2*np.pi/60  # Convert rpm to rad/s
+    for i in range(1, max_steps):
+        a = acc(V[i-1], W[i-1], fetch_wind_data(wind))
+        V[i] = V[i-1] + a * dt
+        P[i] = P[i-1] + V[i-1] * dt
+        W[i] = W[i-1]*np.exp(-5e-4*dt)  # Assuming 4% spin decay every second (4%/60 = 5e-4)
+        if P[i][2] < 0: # Stop if the ball hits the ground
+            P = P[:i+1]
+            t = t[:i+1]
+            break
     return t, P

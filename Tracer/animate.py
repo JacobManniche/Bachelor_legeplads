@@ -1,57 +1,55 @@
 import numpy as np
 import plotly.graph_objects as go
-from tracer import solver, initial_velocity, rpm2radps
+from tracer import solver, initial_velocity
 
-def animate(P0, V0, W0, wind, dt=0.01, randomize_wind=False):
-
-    t, p = solver(P0, V0, W0, wind, dt=dt, randomize_wind=randomize_wind)
+def animate(P0, V0, W0, wind, dt=0.01):
+    t, p = solver(P0, V0, W0, wind, dt=dt)
     
-    ## Define the scene configuration with dynamic ranges and aspect ratio ##
-    z_max = p[:,2].max()
-    x_min, x_max = p[:,0].min(), p[:,0].max()
-    y_min, y_max = p[:,1].min(), p[:,1].max()
-    padding = 10
+    # 1. Pre-calculate indices to avoid repeated slicing
+    step_size = max(1, len(p) // 100)
+    indices = np.arange(0, len(p), step_size)
 
-    ranges = [
-        [x_min-padding, x_max+padding],
-        [y_min-padding, y_max+padding],
-        [0, z_max+padding]
-    ]
+    # 2. Static Background Elements (The full path)
+    # We plot the full trajectory once with low opacity as a "guide"
+    full_trajectory = go.Scatter3d(
+        x=p[:, 0], y=p[:, 1], z=p[:, 2],
+        mode='lines',
+        line=dict(color='rgba(255, 0, 0, 0.2)', width=2), # Faded red
+        name="Full Path"
+    )
 
-    scene_config = dict()
-    scene_config["xaxis"] = {"range": ranges[0], 'tickmode': 'linear', 'dtick': padding}
-    scene_config["yaxis"] = {"range": ranges[1], 'tickmode': 'linear', 'dtick': padding}
-    scene_config["zaxis"] = {"range": ranges[2], "backgroundcolor": "rgb(34, 139, 34)"}
-    scene_config["camera"] = {"eye": {"x": 2, "y": 2, "z": 2}}
-    scene_config["aspectmode"] = "manual"
-    scene_config["aspectratio"] = {"x": ranges[0][1] - ranges[0][0], "y": ranges[1][1] - ranges[1][0], "z": ranges[2][1] - ranges[2][0]}
+    # The actual "Moving" Tracer line (initially just the first point)
+    moving_ball = go.Scatter3d(
+        x=[p[0, 0]], y=[p[0, 1]], z=[p[0, 2]],
+        mode='markers+text',
+        marker=dict(color='white', size=6, line=dict(color='black', width=1)),
+        text=["Ball"],
+        name="Ball"
+    )
 
-    ## Render the frames with step size ##
-    step_size = max(1, len(p) // 100)  # Adjust step size for smoother animation
-
+    # 3. Optimized Frames: ONLY update the marker position
     frames = [
         go.Frame(
-            data=[
-                go.Scatter3d(x=p[:i, 0], y=p[:i, 1], z=p[:i, 2], mode='lines', line={'color': 'red', 'width': 4}),
-                go.Scatter3d(x=[p[i, 0]], y=[p[i, 1]], z=[p[i, 2]], mode='markers', marker={'color': 'Lightgray', 'size': 5})
-                ],
-            name=str(i)
-        ) for i in range(0, len(p), step_size)  # Adjust step for smoother animation
+            data=[go.Scatter3d(x=[p[i, 0]], y=[p[i, 1]], z=[p[i, 2]])],
+            name=str(i),
+            traces=[1] # This tells Plotly to only update the second trace (moving_ball)
+        ) for i in indices
     ]
 
-    starting_frame = [
-        go.Scatter3d(x=[p[0,0]], y=[p[0,1]], z=[p[0,2]], mode='lines', line={'color': 'red', 'width': 4}, name="Trajectory"),
-        go.Scatter3d(x=[p[0,0]], y=[p[0,1]], z=[p[0,2]], mode='markers+text', marker={'color': 'Lightgray', 'size': 5}, text=["Start"], textfont={'color': 'white', 'size': 12}, name="Ball")
-    ]
+    # 4. Faster Layout Config
+    scene_config = dict(
+        xaxis=dict(range=[p[:,0].min()-5, p[:,0].max()+5]),
+        yaxis=dict(range=[p[:,1].min()-5, p[:,1].max()+5]),
+        zaxis=dict(range=[0, p[:,2].max()+5], backgroundcolor="rgb(34, 139, 34)"),
+        aspectmode="data" # 'data' is faster than 'manual' with complex ratios
+    )
 
-    frames[0] = go.Frame(data=starting_frame, name="0") # Change initial frame for reset button
-
-    ## Define the buttons for play, pause, and reset ##
+        ## Define the buttons for play, pause, and reset ##
     updatemenu = [
         {
             "buttons": [
                 {
-                    "args": [None, {"frame": {"duration": (dt*0.9)*1000*step_size, "redraw": True}, "fromcurrent": True}], # (0.9 to make up for computation time, 1000 to convert to ms, step_size to adjust for frame skipping)
+                    "args": [None, {"frame": {"duration": (dt*0.9)*1000*step_size, "redraw": True},  "mode": "immediate", "transition": {"duration": 0}, "fromcurrent": True}], # (0.9 to make up for computation time, 1000 to convert to ms, step_size to adjust for frame skipping)
                     "label": "▶ Play",
                     "method": "animate"
                 },
@@ -88,21 +86,26 @@ def animate(P0, V0, W0, wind, dt=0.01, randomize_wind=False):
         }
     ]
 
-    ## Assemble the Figure ##
     fig = go.Figure(
-        data=starting_frame,  # Initial empty line for trajectory
+        data=[full_trajectory, moving_ball],
         frames=frames,
-        layout=go.Layout(title="Golf Ball Trajectory", updatemenus=updatemenu, scene=scene_config, sliders=sliders)
+        layout=go.Layout(
+            title="Optimized Golf Trajectory",
+            scene=scene_config,
+            updatemenus=updatemenu,
+            sliders=sliders
+        )
     )
 
     fig.show()
+
 
 if __name__ == "__main__":
     # This is where we will run our simulation and plot the results
     # We can change the initial conditions and parameters here to see how they affect the trajectory of the ball
     P0 = [0,0,0]
     V0 = initial_velocity(speed=48, angle=20) 
-    W0 = np.array([rpm2radps(8647), 0, 0])
-    wind = np.array([8, 3, 6]) # 
+    W0 = np.array([8647, 10, 50])
+    wind = np.array([-2, 1.5, 1.9]) # 
 
-    animate(P0, V0, W0, wind, dt=0.01, randomize_wind=True)
+    animate(P0, V0, W0, wind, dt=0.01)
