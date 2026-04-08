@@ -12,7 +12,7 @@ def initial_velocity(speed, angle):
     return V0
 
 # Constants for acceleration calculations
-r=0.0214; m=0.046; rho=1.2; g=9.81 # inverse mass for efficiency
+r=0.0214; m=0.046; rho=1.204; g=9.81; mu = 1.82e-5 #Tabel B.3 for mu and rho -- # inverse mass for efficiency
 A = np.pi * r**2 # cross-sectional area of the ball
 constant_property = A * rho/(2 * m) # constant property for efficiency
 G = -g * np.array([0, 0, 1]) # gravity vector
@@ -39,23 +39,29 @@ def acc(V, W, wind):
     return a
 
 def coefficients(v, w, r):
-    ## TODO add more realistic models for the drag and lift coefficients
 
-    re = (1.2 * v * (2*r)) / 1.78e-5 # Reynolds Number calculation
-    s = (w * r) / v                   # Spin Ratio
+    re = (rho * v * (2*r)) / mu # Reynolds Number calculation
+    s = (w * r) / v             # Spin Ratio
+
+    # Lift and Drag model based on "Flight Trajectory of a Golf Ball for a Realistic Game" (Kim et al., 2012)
+    re_cr = 0.6e5 # Critical Reynolds number for drag crisis (fig 9.22 Brief Introduction to Fluid Mechanics)
+    Cd1 = 0.25 ; Cd3 = 0.1e-3 ; Cd2 = (re - re_cr) * Cd3 
+    K1 = re * Cd3 ; K2 = re * Cd3 - Cd2
+
+    # ------------ Works only in Re range 0.4e5 to 2.2e5, but gives a more realistic drag crisis behavior ------------
     
-    # Baseline Drag based on Reynolds (simplified transition)
-    if re < 40000:
-        cd_base = 0.5
-    elif re < 150000:
-        # Linear drop during drag crisis
-        cd_base = 0.5 - 0.28 * ((re - 40000) / 110000)
-    else:
-        cd_base = 0.22
-        
-    # Add Spin-Induced Drag (Mencke/Lieberman logic)
-    cd = cd_base + 0.3 * (s**2)
-    cl =  0.1 + 0.5 * s
+    if re < re_cr: #Laminar flow/Transition
+        D_re = K1 + Cd1 * K1 - 1
+    else: #Turbulent flow
+        D_re = K2 + Cd1 * K2 - 0.0225 * Cd2 - 1
+    
+    cd = 0.2136 * (-2.1 * np.exp(-0.12 * (D_re + s + 0.35)) + 8.9 * np.exp(-0.22 * (D_re + 0.35)))
+    
+    cl = -0.05 + np.sqrt(0.0025 + 0.36 * s)
+
+    # Printing out Re to check if we are in range
+    # print(f"Re: {re:.2e}, Cd: {cd:.3f}, Cl: {cl:.3f}")
+
     return cd, cl
 
 def fetch_wind_data(wind: WindField, x, y, z):
@@ -76,6 +82,9 @@ def solver(P0, V0, W0, wind: WindField, dt=0.01):
     while P[-1][2] >= 0: # while the ball is above the ground
         V.append(V[-1] + acc(V[-1], W[-1], fetch_wind_data(wind, *P[-1])) * dt)
         P.append(P[-1] + V[-1] * dt)
-        W.append(W[-1]*np.exp(-0.04*dt))  # Assuming 4% spin decay every second (4%/60 = 5e-4)
+        W.append(W[-1]*np.exp(-5e-4*dt))  # Assuming 4% spin decay every second (4%/60 = 5e-4)
         t.append(t[-1] + dt)
     return np.array(t), np.array(P), np.array(V), np.array(W)
+
+
+
