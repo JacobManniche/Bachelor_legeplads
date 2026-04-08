@@ -1,0 +1,20 @@
+#!/bin/bash
+#BSUB -J pywake
+#BSUB -q hpc
+#BSUB -n 22
+#BSUB -W 12:00
+#BSUB -o pywake_%J.out
+#BSUB -R "span[ptile=22]"
+#BSUB -R "rusage[mem=8192]"
+ulimit -s unlimited
+shopt -s expand_aliases
+source ~/.bashrc
+py3el
+
+# Run directly in submit directory
+cd "$LS_SUBCWD"
+python3 terrain_test_case.py
+
+
+
+
