@@ -1,9 +1,10 @@
 import numpy as np
 import plotly.graph_objects as go
+from windfield import WindField
 from tracer import solver, initial_velocity
 
-def animate(P0, V0, W0, wind, dt=0.01):
-    t, p = solver(P0, V0, W0, wind, dt=dt)
+def animate(P0, V0, W0, wind: WindField, dt=0.01):
+    t, p, v, w = solver(P0, V0, W0, wind, dt=dt)
     
     # 1. Pre-calculate indices to avoid repeated slicing
     step_size = max(1, len(p) // 100)
@@ -14,8 +15,15 @@ def animate(P0, V0, W0, wind, dt=0.01):
     full_trajectory = go.Scatter3d(
         x=p[:, 0], y=p[:, 1], z=p[:, 2],
         mode='lines',
-        line=dict(color='rgba(255, 0, 0, 0.2)', width=2), # Faded red
-        name="Full Path"
+        line=dict(color='rgba(255, 0, 0, 0.7)', width=2), # Faded red
+        name="Full Path",
+        customdata=np.column_stack((v, w)),
+        hovertemplate=(
+            "<b>Position:\t</b> %{x:.1f}m %{y:.1f}m %{z:.1f}m<br>" +
+            "<b>Velocity:\t</b> %{customdata[0]:.1f}, %{customdata[1]:.1f}, %{customdata[2]:.1f} m/s<br>" +
+            "<b>Spin:\t</b> %{customdata[3]:.0f} rad/s<br>" +
+            "<extra></extra>"    
+            )
     )
 
     # The actual "Moving" Tracer line (initially just the first point)
@@ -104,8 +112,10 @@ if __name__ == "__main__":
     # This is where we will run our simulation and plot the results
     # We can change the initial conditions and parameters here to see how they affect the trajectory of the ball
     P0 = [0,0,0]
-    V0 = initial_velocity(speed=48, angle=20) 
-    W0 = np.array([8647, 10, 50])
-    wind = np.array([-2, 1.5, 1.9]) # 
+    #V0 = initial_velocity(speed=48, angle=60) 
+    V0 = initial_velocity(speed=76.4, angle=10.4) 
+    W0 = np.array([3, -2545, 5])
+    wind = WindField(nx=30, ny=150, nz=50, direction= 90, profile='log', z0=0.03)
+    #wind = WindField(nx=30, ny=150, nz=50, profile='uniform', U_ref=0)
 
     animate(P0, V0, W0, wind, dt=0.01)

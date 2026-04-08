@@ -1,10 +1,12 @@
 import numpy as np
 
 class WindField:
-    def __init__(self, nx, ny, nz, profile="log", U_ref=10.0, z0=0.1):
+    def __init__(self, nx, ny, nz, direction=0, profile="log", U_ref=10.0, z0=0.1):
         """
         nx, ny, nz : int
             Grid size in x, y, z directions
+        direction : float
+            Wind direction in degrees (0 is from the south to north)
         profile : str
             Type of wind profile ("log" or "uniform")
         U_ref : float
@@ -44,8 +46,11 @@ class WindField:
             raise ValueError("Unsupported profile type. Use 'uniform' or 'log'.")
         
         # Assign velocity components
-        self.velocity[..., 0] = U   # u-component
-        self.velocity[..., 1] = 0   # v-component
+
+        angle = np.radians(direction)  # Convert direction to radians
+
+        self.velocity[..., 0] = U * np.cos(angle)   # u-component
+        self.velocity[..., 1] = U * np.sin(angle)   # v-component
         self.velocity[..., 2] = 0   # w-component
         
         # Simple TKE model
