@@ -21,7 +21,7 @@ def animate(P0, V0, W0, wind: WindField, dt=0.01):
         hovertemplate=(
             "<b>Position:\t</b> %{x:.1f}m %{y:.1f}m %{z:.1f}m<br>" +
             "<b>Velocity:\t</b> %{customdata[0]:.1f}, %{customdata[1]:.1f}, %{customdata[2]:.1f} m/s<br>" +
-            "<b>Spin:\t</b> %{customdata[3]:.0f} rad/s<br>" +
+            "<b>Spin:\t</b> %{customdata[4]:.0f} rad/s<br>" +
             "<extra></extra>"    
             )
     )
