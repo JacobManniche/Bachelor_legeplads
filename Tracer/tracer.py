@@ -76,6 +76,6 @@ def solver(P0, V0, W0, wind: WindField, dt=0.01):
     while P[-1][2] >= 0: # while the ball is above the ground
         V.append(V[-1] + acc(V[-1], W[-1], fetch_wind_data(wind, *P[-1])) * dt)
         P.append(P[-1] + V[-1] * dt)
-        W.append(W[-1]*np.exp(-0.04*dt))  # Assuming 4% spin decay every second (4%/60 = 5e-4)
+        W.append(W[-1]*np.exp(-5e-4*dt))  # Assuming 4% spin decay every second (4%/60 = 5e-4)
         t.append(t[-1] + dt)
     return np.array(t), np.array(P), np.array(V), np.array(W)
