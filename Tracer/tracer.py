@@ -1,5 +1,6 @@
 import numpy as np
-from windfield import WindField
+from Tracer.lookup import get_cd, get_cl
+from Tracer.windfield import WindField
 
 def norm(arr):
     """Returns the Euclidean norm: sqrt(sum(x_i^2))"""
@@ -16,6 +17,7 @@ r=0.0214; m=0.046; rho=1.204; g=9.81; mu = 1.82e-5 #Tabel B.3 for mu and rho -- 
 A = np.pi * r**2 # cross-sectional area of the ball
 constant_property = A * rho/(2 * m) # constant property for efficiency
 G = -g * np.array([0, 0, 1]) # gravity vector
+I = (2/5) * m * r**2 # moment of inertia for a solid sphere
 
 def acc(V, W, wind):
 
@@ -25,7 +27,7 @@ def acc(V, W, wind):
     UW_cross = np.cross(W, U)
     UW_cross_norm = norm(UW_cross)
     
-    cd, cl = coefficients(U_mag, norm(W), r) # get drag and lift coefficients based on current conditions
+    cd, cl, ct = coefficients(U_mag, norm(W)) # get drag and lift coefficients based on current conditions
 
     # Aerodynamic forces
     D = -constant_property * cd * U_mag * U
@@ -33,36 +35,53 @@ def acc(V, W, wind):
         L = constant_property * cl * U_mag**2 * UW_cross / norm(UW_cross) # The "Standard Aerodynamic" Model
     else:
         L = np.array([0, 0, 0]) # No lift if there is no spin or relative velocity
-
+    # a becomes nan !!!!!
     a = D + L + G # acceleration from Newton's second law
-
-    return a
-
-def coefficients(v, w, r):
-
-    re = (rho * v * (2*r)) / mu # Reynolds Number calculation
-    s = (w * r) / v             # Spin Ratio
-
-    # Lift and Drag model based on "Flight Trajectory of a Golf Ball for a Realistic Game" (Kim et al., 2012)
-    re_cr = 0.6e5 # Critical Reynolds number for drag crisis (fig 9.22 Brief Introduction to Fluid Mechanics)
-    Cd1 = 0.25 ; Cd3 = 0.1e-3 ; Cd2 = (re - re_cr) * Cd3 
-    K1 = re * Cd3 ; K2 = re * Cd3 - Cd2
-
-    # ------------ Works only in Re range 0.4e5 to 2.2e5, but gives a more realistic drag crisis behavior ------------
     
-    if re < re_cr: #Laminar flow/Transition
-        D_re = K1 + Cd1 * K1 - 1
-    else: #Turbulent flow
-        D_re = K2 + Cd1 * K2 - 0.0225 * Cd2 - 1
-    
-    cd = 0.2136 * (-2.1 * np.exp(-0.12 * (D_re + s + 0.35)) + 8.9 * np.exp(-0.22 * (D_re + 0.35)))
-    
-    cl = -0.05 + np.sqrt(0.0025 + 0.36 * s)
+    # Calculate angular acceleration
 
-    # Printing out Re to check if we are in range
-    # print(f"Re: {re:.2e}, Cd: {cd:.3f}, Cl: {cl:.3f}")
+    W_mag = norm(W)
+    if W_mag > 1: # Threshold to stop calculation when spin is near zero
+        unit_W = W / W_mag
+        # Torque magnitude opposes rotation
+        torque_mag = rho * (U_mag**2) * A * r * ct
+        alp = (-torque_mag / I) * unit_W
+    else:
+        alp = np.zeros(3)
 
-    return cd, cl
+    return a, alp
+
+def coefficients(v, w_rad_per_sec):
+    """
+    Calculate drag and lift coefficients based on velocity and angular velocity.
+    
+    Args:
+        v: relative velocity magnitude (m/s)
+        w_rad_per_sec: angular velocity magnitude (rad/s)
+    
+    Returns:
+        (cd, cl): drag and lift coefficients
+    """
+    # Convert angular velocity (rad/s) to RPM
+    rpm = w_rad_per_sec * 60 / (2 * np.pi)
+    
+    # Use interpolators from lookup module
+    cd = get_cd(v, rpm)
+    cl = get_cl(v, rpm)
+    if cd == np.nan or cl == np.nan:
+        print(f"Warning: Coefficients not found for v={v:.2f} m/s and w={rpm:.2f} RPM. Defaulting to cd=0.3, cl=0.2.")
+        cd = 0.3
+        cl = 0.2
+
+    re = (v * (2*r)) / mu # Reynolds Number calculation
+    if re < 360:
+        ct = 128.9/re
+    elif re < 68e3:
+        ct = 6.7545/re**.5
+    else:
+        ct = 0.2398/re**0.2
+    
+    return cd, cl, ct
 
 def fetch_wind_data(wind: WindField, x, y, z):
     # This function will fetch the wind data from an API or a file
@@ -80,11 +99,27 @@ def solver(P0, V0, W0, wind: WindField, dt=0.01):
     V = [V0]
     W = [W0 * 2*np.pi/60] # initial angular velocity (rpm2radps)
     while P[-1][2] >= 0: # while the ball is above the ground
-        V.append(V[-1] + acc(V[-1], W[-1], fetch_wind_data(wind, *P[-1])) * dt)
+        
+        a, alp = acc(V[-1], W[-1], fetch_wind_data(wind, *P[-1]))
+        V.append(V[-1] + a * dt)
         P.append(P[-1] + V[-1] * dt)
-        W.append(W[-1]*np.exp(-5e-4*dt))  # Assuming 4% spin decay every second (4%/60 = 5e-4)
+        W.append(W[-1] + alp * dt)  # Update angular velocity
         t.append(t[-1] + dt)
+    print(f"Final position: {P[-1]}, Total time: {t[-1]:.2f} s")
     return np.array(t), np.array(P), np.array(V), np.array(W)
 
+if __name__ == "__main__":
+    # This is where we will run our simulation and plot the results
+    # We can change the initial conditions and parameters here to see how they affect the trajectory of the ball
+    P0 = [0,0,0]
+    #V0 = initial_velocity(speed=48, angle=60) 
+    V0 = initial_velocity(speed=76.4, angle=20.4) 
+    W0 = np.array([3, -2545, 5])
+    wind = WindField(nx=30, ny=150, nz=50, direction= -90, profile='log', z0=0.03)
+    #wind = WindField(nx=30, ny=150, nz=50, profile='uniform', U_ref=0)
 
+    t, p, v, w = solver(P0, V0, W0, wind)
 
+    import matplotlib.pyplot as plt
+    plt.plot(t, p[:, 2]) # Plot height vs time
+    #plt.plot(t, w[:, 2], label='Vx')

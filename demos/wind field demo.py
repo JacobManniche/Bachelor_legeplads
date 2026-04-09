@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from windfield import WindField
+from Tracer.windfield import WindField
 
 
 # example configuration

@@ -1,6 +1,4 @@
 import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
 
 # -----------------------------
 # Manually digitized data from (Golf Ball Aerodynamics, P W BEARMAN AND J K HARVEY) using PlotDigitizer.com
@@ -149,51 +147,44 @@ cl_data = [
 
 ]
 
-cl_df = pd.DataFrame(cl_data, columns=["U", "RPM", "Cl"])
-cd_df = pd.DataFrame(cd_data, columns=["U", "RPM", "Cd"])
-# -----------------------------
+# Pre-computed interpolators for efficient lookup
+# These are created once when the module is imported, not on every function call
+from scipy.interpolate import CloughTocher2DInterpolator
 
-r = 0.0214  # ball radius (m)
-rho = 1.204
-mu = 1.82e-5
+def _create_interpolator(data):
+    """Create a smooth 2D interpolator from (U, RPM) -> coefficient data"""
+    points = np.array([(d[0], d[1]) for d in data])
+    values = np.array([d[2] for d in data])
+    return CloughTocher2DInterpolator(points, values, rescale=True)
 
-# Angular velocity
-cl_df["omega"] = cl_df["RPM"] * 2*np.pi / 60
-cd_df["omega"] = cd_df["RPM"] * 2*np.pi / 60
-# Spin ratio
-cl_df["spin_ratio"] = cl_df["omega"] * r / cl_df["U"]
-cd_df["spin_ratio"] = cd_df["omega"] * r / cd_df["U"]
-# Reynolds number
-cl_df["Re"] = rho * cl_df["U"] * (2*r) / mu
-cd_df["Re"] = rho * cd_df["U"] * (2*r) / mu
-print(cl_df.head())
-print(cd_df.head())
-# -----------------------------
+# Pre-create interpolators at module load time
+cd_interpolator = _create_interpolator(cd_data)
+cl_interpolator = _create_interpolator(cl_data)
 
-plt.figure(figsize=(8,6))
+def get_cd(u, rpm):
+    """Get drag coefficient for given velocity and RPM, with fallback to nearest neighbor"""
+    
+    if u < 14:
+        u = 14
+    elif u > 81.1:
+        u = 81.1
 
-for U in sorted(cl_df["U"].unique()):
-    cl_subset = cl_df[cl_df["U"] == U]
-    plt.plot(cl_subset["RPM"], cl_subset["Cl"], marker='o', label=f"U = {U} m/s")
+    if rpm > 6230:
+        rpm = 6230
+    
+    val = cd_interpolator(u, rpm)
+    return val
 
-plt.xlabel("RPM")
-plt.ylabel("Cl")
-plt.title("Digitized Lift Coefficient (Bearman & Harvey)")
-plt.legend()
-plt.grid(True)
+def get_cl(u, rpm):
+    """Get lift coefficient for given velocity and RPM, with fallback to nearest neighbor"""
+    
+    if u < 14:
+        u = 14
+    elif u > 81.1:
+        u = 81.1
 
-plt.show()
-
-plt.figure(figsize=(8,6))
-
-for U in sorted(cd_df["U"].unique()):
-    cd_subset = cd_df[cd_df["U"] == U]
-    plt.plot(cd_subset["RPM"], cd_subset["Cd"], marker='o', label=f"U = {U} m/s")
-
-plt.xlabel("RPM")
-plt.ylabel("Cd")
-plt.title("Digitized Drag Coefficient (Bearman & Harvey)")
-plt.legend()
-plt.grid(True)
-
-plt.show()
+    if rpm > 6230:
+        rpm = 6230
+    
+    val = cl_interpolator(u, rpm)
+    return val

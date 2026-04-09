@@ -6,6 +6,9 @@
 # Icon must end with two \r
 Icon
 
+# Huge datafiles
+*.nc
+
 # Thumbnails
 ._*
 
@@ -20,8 +23,10 @@ Icon
 
 # Python bytecode
 **/__pycache__/
+__pycache__/
 *.py[cod]
 *$py.class
+*.egg-info/
 
 # C extensions
 *.so
@@ -51,7 +56,15 @@ MANIFEST
 venv/
 ENV/
 env/
+*.yml
+*.yaml
 
 # IDE specific (Optional but recommended)
 .vscode/
 .idea/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Temporary files
+temp/

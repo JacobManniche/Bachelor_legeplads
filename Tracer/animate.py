@@ -1,7 +1,7 @@
 import numpy as np
 import plotly.graph_objects as go
-from windfield import WindField
-from tracer import solver, initial_velocity
+from Tracer.windfield import WindField
+from Tracer.tracer import solver, initial_velocity
 
 def animate(P0, V0, W0, wind: WindField, dt=0.01):
     t, p, v, w = solver(P0, V0, W0, wind, dt=dt)
@@ -114,8 +114,8 @@ if __name__ == "__main__":
     P0 = [0,0,0]
     #V0 = initial_velocity(speed=48, angle=60) 
     V0 = initial_velocity(speed=76.4, angle=10.4) 
-    W0 = np.array([3, -2545, 5])
-    wind = WindField(nx=30, ny=150, nz=50, direction= 90, profile='log', z0=0.03)
+    W0 = np.array([3, -8545, 5])
+    wind = WindField(nx=250, ny=30, nz=50, direction= -90, profile='log', z0=0.03)
     #wind = WindField(nx=30, ny=150, nz=50, profile='uniform', U_ref=0)
 
     animate(P0, V0, W0, wind, dt=0.01)
