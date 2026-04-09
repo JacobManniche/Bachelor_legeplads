@@ -185,6 +185,8 @@ def get_cl(u, rpm):
 
     if rpm > 6230:
         rpm = 6230
+    elif rpm < 1055:
+        rpm = 1055
     
     val = cl_interpolator(u, rpm)
     return val

@@ -1,14 +1,9 @@
-# %%
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from Tracer.windfield import WindField
 from Tracer.tracer import solver, initial_velocity, fetch_wind_data
 
-# %% [markdown]
-# ### Reading data
-
-# %%
 # Data from tour averages for the men's (PGA) and women's (LPGA) golf turnaments
 # from https://www.trackman.com/blog/golf/introducing-updated-tour-averages
 
@@ -69,83 +64,76 @@ df_lpga = df_lpga.rename(columns={'Ball Speed (mph)':'Ball Speed (m/s)'})
 df_lpga['Club Speed (mph)'] = df_lpga['Club Speed (mph)'] * 0.44704
 df_lpga = df_lpga.rename(columns={'Club Speed (mph)':'Club Speed (m/s)'})
 
-P0 = [0,0,10]
+P0 = [0,0,0]
+directions = [0, 45, 135, 180] #[*range(0, 360, 45)]
+DT = 0.01
 
-carry_pga = []
-maxheight_pga = []
-carry = 0
-max_height = 0
-iterations = 0
-for i in range(len(df_pga)):
-    V0 = initial_velocity(speed=df_pga['Ball Speed (m/s)'][i], angle=df_pga['Launch Angle (deg)'][i])
-    W0 = np.array([0, -df_pga['Spin Rate (rpm)'][i], 0])
+def calculate_trajectory_metrics(df, wind_profile):
+    """Calculate carry and max height for all clubs in dataframe."""
+    carry = []
+    max_height = []
     
-    for dir in range(0, 360, 45):
-        wind = WindField(nx=300, ny=50, nz=50, direction=dir, profile='log', z0=0.01)
-        t, p, v, w = solver(P0, V0, W0, wind, dt=0.01)
+    for i in range(len(df)):
+        total_carry = 0
+        total_height = 0
         
-        carry += (p[-1][0]- p[0][0])
-        max_height += max(p[:,2])
-        iterations += 1
-
-    carry_pga.append(carry/iterations)
-    maxheight_pga.append(max_height/iterations)
+        V0 = initial_velocity(speed=df['Ball Speed (m/s)'][i], angle=df['Launch Angle (deg)'][i])
+        W0 = np.array([0, -df['Spin Rate (rpm)'][i], 0])
+        
+        for dir in directions:
+            wind = WindField(nx=300, ny=50, nz=50, direction=dir, profile=wind_profile, z0=0.003, U_ref=0)
+            t, p, v, w = solver(P0, V0, W0, wind, dt=DT)
+            total_carry += ((p[-1][0] - p[0][0])**2 + (p[-1][1] - p[0][1])**2)**0.5
+            total_height += max(p[:,2])
+        
+        num_directions = len(directions)
+        carry.append(total_carry / num_directions)
+        max_height.append(total_height / num_directions)
+    
+    return carry, max_height
 
 # %%
-carry_lpga = []
-maxheight_lpga = []
-for i in range(len(df_lpga)):
-    V0 = initial_velocity(speed=df_lpga['Ball Speed (m/s)'][i], angle=df_lpga['Launch Angle (deg)'][i])
-    W0 = np.array([0, -df_lpga['Spin Rate (rpm)'][i], 0])
-    
-    for dir in range(0, 360, 45):
-        wind = WindField(nx=300, ny=50, nz=50, direction=dir, profile='log', z0=0.01)
-        t, p, v, w = solver(P0, V0, W0, wind, dt=0.01)
-        
-        carry += (p[-1][0]- p[0][0])
-        max_height += max(p[:,2])
-        iterations += 1
-
-    carry_lpga.append(carry/iterations)
-    maxheight_lpga.append(max_height/iterations)
+carry_pga, maxheight_pga = calculate_trajectory_metrics(df_pga, 'log')
+carry_lpga, maxheight_lpga = calculate_trajectory_metrics(df_lpga, 'uniform')
 
 # %%
-fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+fig, axes = plt.subplots(2, 2, figsize=(10, 5))
+
+# Calculate errors
+pga_carry_error = np.abs((df_pga['Carry (m)'] - carry_pga) / df_pga['Carry (m)']) * 100
+lpga_carry_error = np.abs((df_lpga['Carry (m)'] - carry_lpga) / df_lpga['Carry (m)']) * 100
+pga_height_error = np.abs((df_pga['Max Height (m)'] - maxheight_pga) / df_pga['Max Height (m)']) * 100
+lpga_height_error = np.abs((df_lpga['Max Height (m)'] - maxheight_lpga) / df_lpga['Max Height (m)']) * 100
 
 # Top-left
-axes[0, 0].scatter(df_pga['Club'], df_pga['Carry (m)'],label='PGA data')
+axes[0, 0].scatter(df_pga['Club'], df_pga['Carry (m)'], label='PGA data')
 axes[0, 0].scatter(df_pga['Club'], carry_pga, marker='x', label='PGA Trajectory')
-axes[0, 0].scatter(df_lpga['Club'], df_lpga['Carry (m)'],label='LPGA data')
+axes[0, 0].scatter(df_lpga['Club'], df_lpga['Carry (m)'], label='LPGA data')
 axes[0, 0].scatter(df_lpga['Club'], carry_lpga, marker='x', label='LPGA Trajectory')
 axes[0, 0].set_title("Carry comparison")
 axes[0, 0].legend()
 
 # Top-right
-axes[0, 1].scatter(df_pga['Club'], df_pga['Max Height (m)'],label='LPGA data')
-axes[0, 1].scatter(df_pga['Club'], maxheight_pga, marker='x', label='LGPA Trajectory')
-axes[0, 1].scatter(df_lpga['Club'], df_lpga['Max Height (m)'],label='LPGA data')
-axes[0, 1].scatter(df_lpga['Club'], maxheight_lpga, marker='x', label='LGPA Trajectory')
+axes[0, 1].scatter(df_pga['Club'], df_pga['Max Height (m)'], label='PGA data')
+axes[0, 1].scatter(df_pga['Club'], maxheight_pga, marker='x', label='PGA Trajectory')
+axes[0, 1].scatter(df_lpga['Club'], df_lpga['Max Height (m)'], label='LPGA data')
+axes[0, 1].scatter(df_lpga['Club'], maxheight_lpga, marker='x', label='LPGA Trajectory')
 axes[0, 1].set_title("Max height")
 axes[0, 1].legend()
 
 # Bottom-left
-axes[1, 0].scatter(df_pga['Club'], ((df_pga['Carry (m)'] - carry_pga)/df_pga['Carry (m)'])*100, label='PGA error')
-axes[1, 0].scatter(df_lpga['Club'], ((df_lpga['Carry (m)'] - carry_lpga)/df_lpga['Carry (m)'])*100, label='LPGA error')
-axes[1, 0].set_title("Carry error")
+axes[1, 0].scatter(df_pga['Club'], pga_carry_error, label='PGA error')
+axes[1, 0].scatter(df_lpga['Club'], lpga_carry_error, label='LPGA error')
+axes[1, 0].set_title("Carry error (absolute)")
 axes[1, 0].set_ylabel('Error (%)')
 axes[1, 0].legend()
 
 # Bottom-right
-axes[1, 1].scatter(df_pga['Club'], ((df_pga['Max Height (m)'] - maxheight_pga)/df_pga['Max Height (m)'])*100, label='PGA error')
-axes[1, 1].scatter(df_lpga['Club'], ((df_lpga['Max Height (m)'] - maxheight_lpga)/df_lpga['Max Height (m)'])*100, label='LPGA error')
-axes[1, 1].set_title("Max height error")
+axes[1, 1].scatter(df_pga['Club'], pga_height_error, label='PGA error')
+axes[1, 1].scatter(df_lpga['Club'], lpga_height_error, label='LPGA error')
+axes[1, 1].set_title("Max height error (absolute)")
 axes[1, 1].set_ylabel('Error (%)')
 axes[1, 1].legend()
 
 plt.tight_layout()
 plt.show()
-
-# %%
-
-
-
