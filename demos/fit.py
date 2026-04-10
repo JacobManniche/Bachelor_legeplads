@@ -6,7 +6,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # Bearman and Harvey data
-# Lift coefficient vs spin factor (v/U)
+# Lift coefficient vs spin factor (S)
 cl_data = {
     'v_U': np.array([0.02011326174665183, 0.02429808975566769, 0.028361959589688575, 0.034263037414684464,
                      0.043332711992731095, 0.05234865128383021, 0.06180802080978374, 0.0755282656232066,
@@ -20,7 +20,7 @@ cl_data = {
                     0.24074074940753357, 0.2555555727256168, 0.2660493803994538, 0.27901235668965474])
 }
 
-# Drag coefficient vs spin factor (v/U)
+# Drag coefficient vs spin factor (S)
 cd_data = {
     'v_U': np.array([0.01988416952070005, 0.022945446364320162, 0.02632679792300783, 0.031442163981969355,
                      0.03566471185406009, 0.040223297987607626, 0.04695066828545349, 0.0570451766161739,
@@ -78,7 +78,7 @@ popt_linear, _ = curve_fit(linear, cl_data['v_U'], cl_data['cl'])
 cl_pred_linear = linear(cl_data['v_U'], *popt_linear)
 r2_cl = r_squared(cl_data['cl'], cl_pred_linear)
 
-print(f"\nLinear fit: CL = {popt_linear[0]:.6f} * v/U + {popt_linear[1]:.6f}")
+print(f"\nLinear fit: CL = {popt_linear[0]:.6f} * S + {popt_linear[1]:.6f}")
 print(f"  R² = {r2_cl:.6f}")
 
 # ============================================================
@@ -93,7 +93,7 @@ popt_quad_cd, _ = curve_fit(poly2, cd_data['v_U'], cd_data['cd'])
 cd_pred_quad = poly2(cd_data['v_U'], *popt_quad_cd)
 r2_cd = r_squared(cd_data['cd'], cd_pred_quad)
 
-print(f"\nQuadratic fit: CD = {popt_quad_cd[0]:.6f} * (v/U)² + {popt_quad_cd[1]:.6f} * v/U + {popt_quad_cd[2]:.6f}")
+print(f"\nQuadratic fit: CD = {popt_quad_cd[0]:.6f} * (S)² + {popt_quad_cd[1]:.6f} * S + {popt_quad_cd[2]:.6f}")
 print(f"  R² = {r2_cd:.6f}")
 
 # ============================================================
@@ -115,11 +115,11 @@ cl_fit_smooth = linear(v_u_smooth_cl, *popt_linear)
 ax.plot(v_u_smooth_cl, cl_fit_smooth, 'r-', linewidth=3, label='Linear Fit', alpha=0.85)
 
 # Create equation string with proper formatting
-eq_cl = f'$C_L = {popt_linear[0]:.4f} \\cdot (v/U) + {popt_linear[1]:.4f}$\n$R^2 = {r2_cl:.5f}$'
+eq_cl = f'$C_L = {popt_linear[0]:.4f} \\cdot (S) + {popt_linear[1]:.4f}$\n$R^2 = {r2_cl:.5f}$'
 ax.text(0.05, 0.95, eq_cl, transform=ax.transAxes, fontsize=13, verticalalignment='top',
         bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
 
-ax.set_xlabel('Spin Factor (v/U)', fontsize=13, fontweight='bold')
+ax.set_xlabel('Spin Factor (S)', fontsize=13, fontweight='bold')
 ax.set_ylabel('Lift Coefficient ($C_L$)', fontsize=13, fontweight='bold')
 ax.set_title('Bearman & Harvey: Lift Coefficient (Linear Fit)', fontsize=14, fontweight='bold')
 ax.legend(fontsize=11, loc='lower right')
@@ -135,14 +135,14 @@ cd_fit_smooth = poly2(v_u_smooth_cd, *popt_quad_cd)
 ax.plot(v_u_smooth_cd, cd_fit_smooth, 'b-', linewidth=3, label='Quadratic Fit', alpha=0.85)
 
 # Create equation string with proper formatting
-eq_cd = f'$C_D = {popt_quad_cd[0]:.4f} \\cdot (v/U)^2 + {popt_quad_cd[1]:.4f} \\cdot (v/U) + {popt_quad_cd[2]:.4f}$\n$R^2 = {r2_cd:.5f}$'
+eq_cd = f'$C_D = {popt_quad_cd[0]:.4f} \\cdot (S)^2 + {popt_quad_cd[1]:.4f} \\cdot (S) + {popt_quad_cd[2]:.4f}$\n$R^2 = {r2_cd:.5f}$'
 ax.text(0.05, 0.95, eq_cd, transform=ax.transAxes, fontsize=13, verticalalignment='top',
         bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
 
-ax.set_xlabel('Spin Factor (v/U)', fontsize=13, fontweight='bold')
+ax.set_xlabel('Spin Factor (S)', fontsize=13, fontweight='bold')
 ax.set_ylabel('Drag Coefficient ($C_D$)', fontsize=13, fontweight='bold')
 ax.set_title('Bearman & Harvey: Drag Coefficient (Quadratic Fit)', fontsize=14, fontweight='bold')
-ax.legend(fontsize=11, loc='upper left')
+ax.legend(fontsize=11, loc='lower right')
 ax.grid(True, alpha=0.35, linestyle='--')
 ax.set_axisbelow(True)
 

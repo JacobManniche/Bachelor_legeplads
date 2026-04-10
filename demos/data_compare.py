@@ -1,8 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from Tracer.windfield import WindField
-from Tracer.tracer import solver, initial_velocity, fetch_wind_data
+from Tracer import WindField, solver, initial_velocity
 
 # Data from tour averages for the men's (PGA) and women's (LPGA) golf turnaments
 # from https://www.trackman.com/blog/golf/introducing-updated-tour-averages

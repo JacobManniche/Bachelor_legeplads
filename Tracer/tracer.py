@@ -51,7 +51,7 @@ def acc(V, W, wind):
 
     return a, alp
 
-def coefficients(v, w):
+def coefficients_(v, w):
     """
     Calculate drag and lift coefficients based on velocity and angular velocity.
     
@@ -83,6 +83,51 @@ def coefficients(v, w):
         cl = -3.25*s**2 + 1.99*s
     else:
         cl = 0.2
+
+    if re < 360:
+        ct = 128.9/re
+    elif re < 68e3:
+        ct = 6.7545/re**.5
+    else:
+        ct = 0.2398/re**0.2
+    return cd, cl, ct
+
+
+def coefficients(v, w):
+    """
+    Calculate drag and lift coefficients based on velocity and angular velocity.
+    
+    Args:
+        v: relative velocity magnitude (m/s)
+        w: angular velocity magnitude (rad/s)
+    
+    Returns:
+        (cd, cl): drag and lift coefficients
+    """
+    
+    re = (v * (2*r)) / mu # Reynolds Number calculation
+    s = w * r / v if v > 0 else 0 # Spin parameter
+
+    if s < 0.3:
+        cl = -0.05 + np.sqrt(0.0025 + 0.36 * s)
+    else:
+        cl = 0.3
+    
+    
+    
+    if re < 2e5:
+        re_c = 0.65e5
+        C1 =0.25
+        C2 = (re - re_c) * 1e-4
+        K1 = re * 1e-4
+        K2 = re * 1e-4 - C2
+        D = K1 + C1*K1 - 1 if re < re_c else K2 + C1*K2 - 1 - 0.0225*C2
+        cd = 0.2136 * (
+            - 2.1 * np.exp(-0.12 * (D + s + 0.35))
+            + 8.9 * np.exp(-0.22 * (D + 0.35))
+            )
+    else:
+        cd = 0.2
 
     if re < 360:
         ct = 128.9/re
