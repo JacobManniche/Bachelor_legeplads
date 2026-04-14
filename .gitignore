@@ -66,5 +66,6 @@ env/
 # Jupyter Notebook checkpoints
 .ipynb_checkpoints/
 
-# Temporary files
+# Temporary and confidential files
+Confidential/
 temp/

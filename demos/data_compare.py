@@ -64,7 +64,7 @@ df_lpga['Club Speed (mph)'] = df_lpga['Club Speed (mph)'] * 0.44704
 df_lpga = df_lpga.rename(columns={'Club Speed (mph)':'Club Speed (m/s)'})
 
 P0 = [0,0,0]
-directions = [0, 45, 135, 180] #[*range(0, 360, 45)]
+directions = [0, 45, 90, 75, 180]#, [*range(0, 360, 45)]
 DT = 0.01
 
 def calculate_trajectory_metrics(df, wind_profile):
@@ -88,51 +88,64 @@ def calculate_trajectory_metrics(df, wind_profile):
         num_directions = len(directions)
         carry.append(total_carry / num_directions)
         max_height.append(total_height / num_directions)
+        print('.', end='', flush=True)
     
     return carry, max_height
 
-# %%
-carry_pga, maxheight_pga = calculate_trajectory_metrics(df_pga, 'log')
-carry_lpga, maxheight_lpga = calculate_trajectory_metrics(df_lpga, 'uniform')
+def plot_comparison():
+    carry_pga, maxheight_pga = calculate_trajectory_metrics(df_pga, 'log')
+    carry_lpga, maxheight_lpga = calculate_trajectory_metrics(df_lpga, 'log')
 
-# %%
-fig, axes = plt.subplots(2, 2, figsize=(10, 5))
+    fig, axes = plt.subplots(2, 2, figsize=(12, 6))
 
-# Calculate errors
-pga_carry_error = np.abs((df_pga['Carry (m)'] - carry_pga) / df_pga['Carry (m)']) * 100
-lpga_carry_error = np.abs((df_lpga['Carry (m)'] - carry_lpga) / df_lpga['Carry (m)']) * 100
-pga_height_error = np.abs((df_pga['Max Height (m)'] - maxheight_pga) / df_pga['Max Height (m)']) * 100
-lpga_height_error = np.abs((df_lpga['Max Height (m)'] - maxheight_lpga) / df_lpga['Max Height (m)']) * 100
+    for ax in axes.flat:
+        ax.grid(True, which='both', linestyle='--', linewidth=0.5, zorder=-1.0)
 
-# Top-left
-axes[0, 0].scatter(df_pga['Club'], df_pga['Carry (m)'], label='PGA data')
-axes[0, 0].scatter(df_pga['Club'], carry_pga, marker='x', label='PGA Trajectory')
-axes[0, 0].scatter(df_lpga['Club'], df_lpga['Carry (m)'], label='LPGA data')
-axes[0, 0].scatter(df_lpga['Club'], carry_lpga, marker='x', label='LPGA Trajectory')
-axes[0, 0].set_title("Carry comparison")
-axes[0, 0].legend()
+    # Calculate errors
+    pga_carry_error = ((df_pga['Carry (m)'] - carry_pga) / df_pga['Carry (m)']) * 100
+    lpga_carry_error = ((df_lpga['Carry (m)'] - carry_lpga) / df_lpga['Carry (m)']) * 100
+    pga_height_error = ((df_pga['Max Height (m)'] - maxheight_pga) / df_pga['Max Height (m)']) * 100
+    lpga_height_error = ((df_lpga['Max Height (m)'] - maxheight_lpga) / df_lpga['Max Height (m)']) * 100
 
-# Top-right
-axes[0, 1].scatter(df_pga['Club'], df_pga['Max Height (m)'], label='PGA data')
-axes[0, 1].scatter(df_pga['Club'], maxheight_pga, marker='x', label='PGA Trajectory')
-axes[0, 1].scatter(df_lpga['Club'], df_lpga['Max Height (m)'], label='LPGA data')
-axes[0, 1].scatter(df_lpga['Club'], maxheight_lpga, marker='x', label='LPGA Trajectory')
-axes[0, 1].set_title("Max height")
-axes[0, 1].legend()
+    # Top-left
+    axes[0, 0].scatter(df_pga['Club'], df_pga['Carry (m)'], label='PGA data', color='tab:blue', zorder=1)
+    axes[0, 0].scatter(df_pga['Club'], carry_pga, marker='+', label='PGA Trajectory', color='tab:green', zorder=2)
+    axes[0, 0].scatter(df_lpga['Club'], df_lpga['Carry (m)'], label='LPGA data', color='tab:red', zorder=1)
+    axes[0, 0].scatter(df_lpga['Club'], carry_lpga, marker='+', label='LPGA Trajectory', color='tab:orange', zorder=2)
+    axes[0, 0].set_xticks(df_pga['Club'], "")
+    axes[0, 0].set_title("Carry comparison (m)")
 
-# Bottom-left
-axes[1, 0].scatter(df_pga['Club'], pga_carry_error, label='PGA error')
-axes[1, 0].scatter(df_lpga['Club'], lpga_carry_error, label='LPGA error')
-axes[1, 0].set_title("Carry error (absolute)")
-axes[1, 0].set_ylabel('Error (%)')
-axes[1, 0].legend()
+    # Top-right
 
-# Bottom-right
-axes[1, 1].scatter(df_pga['Club'], pga_height_error, label='PGA error')
-axes[1, 1].scatter(df_lpga['Club'], lpga_height_error, label='LPGA error')
-axes[1, 1].set_title("Max height error (absolute)")
-axes[1, 1].set_ylabel('Error (%)')
-axes[1, 1].legend()
+    axes[0, 1].scatter(df_pga['Club'], df_pga['Max Height (m)'], label='PGA data', color='tab:blue', zorder=1)
+    axes[0, 1].scatter(df_pga['Club'], maxheight_pga, marker='+', label='PGA Trajectory', color='tab:green', zorder=2)
+    axes[0, 1].scatter(df_lpga['Club'], df_lpga['Max Height (m)'], label='LPGA data', color='tab:red', zorder=1)
+    axes[0, 1].scatter(df_lpga['Club'], maxheight_lpga, marker='+', label='LPGA Trajectory', color='tab:orange', zorder=2)
+    axes[0, 1].set_title("Max height (m)")
+    axes[0, 1].set_xticks(df_pga['Club'], "")
+    axes[0, 1].legend(bbox_to_anchor=(1.04, 1), loc="upper left")
 
-plt.tight_layout()
-plt.show()
+    # Bottom-left
+    axes[1, 0].scatter(df_pga['Club'], pga_carry_error, label='PGA error', color='tab:blue', marker='x')
+    axes[1, 0].scatter(df_lpga['Club'], lpga_carry_error, label='LPGA error', color='tab:red', marker='x')
+    axes[1, 0].axhline(color='darkgray', linestyle='--', linewidth=1.5, zorder=-1.0)
+    axes[1, 0].set_title("Carry error percentage")
+    axes[1, 0].set_ylabel('Error (%)')
+    axes[1, 0].set_xticks(df_pga['Club'])
+    axes[1, 0].set_xticklabels(labels=df_pga['Club'], rotation=45)
+
+    # Bottom-right
+    axes[1, 1].scatter(df_pga['Club'], pga_height_error, label='PGA error', color='tab:blue', marker='x')
+    axes[1, 1].scatter(df_lpga['Club'], lpga_height_error, label='LPGA error', color='tab:red', marker='x')
+    axes[1, 1].axhline(color='darkgray', linestyle='--', linewidth=1.5, zorder=-1.0)
+    axes[1, 1].set_title("Max height error percentage")
+    axes[1, 1].set_ylabel('Error (%)')
+    axes[1, 1].legend(bbox_to_anchor=(1.04, 1), loc="upper left")
+    axes[1, 1].set_xticks(df_pga['Club'])
+    axes[1, 1].set_xticklabels(axes[1, 1].get_xticklabels(), rotation=45)
+
+    plt.tight_layout()
+    plt.show()
+
+if __name__ == "__main__":
+    plot_comparison()
