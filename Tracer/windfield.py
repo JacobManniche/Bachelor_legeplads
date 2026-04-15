@@ -41,6 +41,7 @@ class WindField:
         elif profile == "log":
             # Avoid log(0) by ensuring z > z0
             Z_safe = np.maximum(Z, z0 + 1e-6)
+            u_star= U_ref*(kappa) / (np.log(10/z0))
             U = (u_star / kappa) * np.log(Z_safe / z0)
         else:
             raise ValueError("Unsupported profile type. Use 'uniform' or 'log'.")
