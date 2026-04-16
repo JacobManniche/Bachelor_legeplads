@@ -25,9 +25,8 @@ def plot_trajectories(trajectories, plot=True):
     ax[2].set_title('Spin Rate Decay Over Time')
     ax[2].grid()
 
-    plt.tight_layout()
-
     if plot:
+        plt.tight_layout()
         plt.show()
     else:
         return ax
@@ -65,10 +64,12 @@ def plot_coefficients(trajectories, plot=True):
     ax[1, 1].set_ylabel('Lift Coefficient (Cl)')
     ax[1, 1].set_title('Lift Coefficient Decay Over Time')
     ax[1, 1].grid()
-    plt.tight_layout()
+    
     if plot:
+        plt.tight_layout()
         plt.show()
     else:
+        print("Returning axes for further manipulation...")
         return ax
 
 if __name__ == "__main__":
