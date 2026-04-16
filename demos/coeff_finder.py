@@ -156,7 +156,7 @@ def objective_function(params, all_rows):
         # We weight Carry more heavily than Height (standard practice)
         total_error += (sim_carry - data_row['Target_Carry'])**2
         total_error += (sim_max_height - data_row['Target_Height'])**2
-        
+    
     return total_error
 
 # Initial guess from the paper
