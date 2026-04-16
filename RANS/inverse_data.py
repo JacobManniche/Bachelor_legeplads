@@ -1,27 +1,30 @@
+# --- Replacement for InverseMap ---
 import xarray as xr
-import xesmf as xe
 import numpy as np
+from scipy.interpolate import griddata
 
-# 1. Load your curvilinear NetCDF
-ds = xr.open_dataset('flowdata_terrain_mb.nc')
+infile = '/Users/eskefr/Library/CloudStorage/OneDrive-DanmarksTekniskeUniversitet/6. semester/Bachelor/Github/Bachelor_legeplads/RANS/flowdata_terrain_mb.nc'
+data = xr.open_dataset(infile)
 
-# 2. Define the 'Target' Cartesian Grid
-# xESMF expects the target to be a dataset with 'lat' and 'lon' 
-# (or 'x' and 'y') coordinates.
-ds_out = xr.Dataset(
-    {
-        "x": (["x"], np.linspace(ds.x.min(), ds.x.max(), 500)),
-        "y": (["y"], np.linspace(ds.y.min(), ds.y.max(), 500)),
-    }
-)
+H=300.0
 
-# 3. Create the Regridder
-# 'bilinear' or 'patch' are common; 'patch' is better for preserving 
-# the shape of a Gaussian hill as it minimizes noise.
-regridder = xe.Regridder(ds, ds_out, method='patch')
+# 1. Flatten the 3D curvilinear coordinates (i, j, k) into a list of points
+# We use .values to get the numpy arrays from the xarray dataset
+points_3d = np.array([
+    data['x'].values.flatten(), 
+    data['y'].values.flatten(), 
+    data['z'].values.flatten()
+]).T
 
-# 4. Transform the data
-ds_cartesian = regridder(ds)
+# 2. Define the target points (where you want to extract data)
+npoints = 1
+xi = np.array([0.0, 0.0, H + 20.0]) # 20m above hill top
 
-# Save back to a new NetCDF
-ds_cartesian.to_netcdf('cartesian_output.nc')
+# 3. Interpolate U, V, and W
+# Note: 'linear' is much faster for 3D than 'cubic'
+Ui = griddata(points_3d, data['U'].values.flatten(), xi, method='linear')
+Vi = griddata(points_3d, data['V'].values.flatten(), xi, method='linear')
+Wi = griddata(points_3d, data['W'].values.flatten(), xi, method='linear')
+
+print(f"Interpolated Velocities at {xi}:")
+print(f"U: {Ui}, V: {Vi}, W: {Wi}")

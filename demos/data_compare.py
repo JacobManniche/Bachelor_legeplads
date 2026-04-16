@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from Tracer import WindField, solver, initial_velocity
+from Tracer import WindField, solver, initial_velocity, initial_spin_rate
 
 # Data from tour averages for the men's (PGA) and women's (LPGA) golf turnaments
 # from https://www.trackman.com/blog/golf/introducing-updated-tour-averages
@@ -63,7 +63,6 @@ df_lpga = df_lpga.rename(columns={'Ball Speed (mph)':'Ball Speed (m/s)'})
 df_lpga['Club Speed (mph)'] = df_lpga['Club Speed (mph)'] * 0.44704
 df_lpga = df_lpga.rename(columns={'Club Speed (mph)':'Club Speed (m/s)'})
 
-P0 = [0,0,0]
 directions = [0, 45, 90, 75, 180]#, [*range(0, 360, 45)]
 DT = 0.01
 
@@ -77,11 +76,11 @@ def calculate_trajectory_metrics(df, wind_profile):
         total_height = 0
         
         V0 = initial_velocity(speed=df['Ball Speed (m/s)'][i], angle=df['Launch Angle (deg)'][i])
-        W0 = np.array([0, -df['Spin Rate (rpm)'][i], 0])
+        W0 = initial_spin_rate(spin_rate=df['Spin Rate (rpm)'][i])
         
         for dir in directions:
-            wind = WindField(nx=300, ny=50, nz=50, direction=dir, profile=wind_profile, z0=0.003, U_ref=0)
-            t, p, v, w = solver(P0, V0, W0, wind, dt=DT)
+            wind = WindField(nx=300, ny=50, nz=50, direction=dir, profile=wind_profile, z0=0.003, U_ref=6)
+            p = solver(V0, W0, wind=wind, dt=DT)[1]
             total_carry += ((p[-1][0] - p[0][0])**2 + (p[-1][1] - p[0][1])**2)**0.5
             total_height += max(p[:,2])
         

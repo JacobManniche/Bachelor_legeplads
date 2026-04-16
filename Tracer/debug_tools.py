@@ -3,7 +3,7 @@ from Tracer.tracer import norm, coefficients
 import numpy as np
 import matplotlib.pyplot as plt
 
-def plot_trajectory(trajectories, plot=True):
+def plot_trajectories(trajectories, plot=True):
     ax = plt.subplots(3, 1, figsize=(10, 8))[1]
     for t, p, v, w in trajectories:
         ax[0].plot(p[:, 0], p[:, 2]) # Plot height vs time
@@ -32,7 +32,7 @@ def plot_trajectory(trajectories, plot=True):
     else:
         return ax
 
-def plot_coefficients(trajectories):
+def plot_coefficients(trajectories, plot=True):
     mu = 1.82e-5 # Dynamic viscosity of air (kg/(m·s))
     r = 0.0214 # Radius of the golf ball (m)
     
@@ -66,7 +66,10 @@ def plot_coefficients(trajectories):
     ax[1, 1].set_title('Lift Coefficient Decay Over Time')
     ax[1, 1].grid()
     plt.tight_layout()
-    plt.show()
+    if plot:
+        plt.show()
+    else:
+        return ax
 
 if __name__ == "__main__":
     P0 = [0,0,0]
@@ -86,7 +89,7 @@ if __name__ == "__main__":
     t = []
     for decay in [0.05, 0.1, 0.2, 1]:
         t.append(solver(P0, V0, W0, wind, dt=0.01, decay_rate=decay))
-    plot_trajectory(t)
+    plot_trajectories(t)
     plot_coefficients(t)
 
 
