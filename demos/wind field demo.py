@@ -1,14 +1,13 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from Tracer.windfield import WindField
-
+from Tracer.tracer import fetch_wind_data
 
 # example configuration
-wf = WindField(nx=500, ny=100, nz=100, profile="log",U_ref=10,z0=0.03)
+wf = WindField(nx=500, ny=100, nz=100, profile="log",U_ref=10,z0=0.03,direction=0)
 
-point =wf.get_point(20,10,10)
+point = wf.get_point(10,10,90)
 print(point)
-
 #--------------------------------------------------------------------
 #Plotting
 

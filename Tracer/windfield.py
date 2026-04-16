@@ -19,7 +19,6 @@ class WindField:
 
         # Constants
         kappa = 0.4
-        u_star = 0.4
 
         self.nx = nx
         self.ny = ny
