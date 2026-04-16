@@ -10,7 +10,7 @@ class WindField:
         profile : str
             Type of wind profile ("log" or "uniform")
         U_ref : float
-            Reference wind speed (m/s)
+            Reference wind speed (m/s) at 10 meters above ground
         z_ref : float
             Reference height for log profile (m)
         z0 : float

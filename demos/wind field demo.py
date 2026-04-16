@@ -4,17 +4,17 @@ from Tracer.windfield import WindField
 
 
 # example configuration
-wf = WindField(nx=500, ny=100, nz=100, profile="log",U_ref=10)
+wf = WindField(nx=500, ny=100, nz=100, profile="log",U_ref=10,z0=0.03)
 
-point =wf.get_point(10,10,10)
+point =wf.get_point(20,10,10)
 print(point)
 
 #--------------------------------------------------------------------
-# Plotting
+#Plotting
 
 #fig = plt.figure(figsize=(12,8))
 #ax = fig.add_subplot(111, projection='3d')
-## Downsample the field for 3D plotting
+# Downsample the field for 3D plotting
 #step = 10
 #x = np.arange(0, wf.nx, step)
 #y = np.arange(0, wf.ny, step)
