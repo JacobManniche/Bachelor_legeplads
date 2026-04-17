@@ -1,7 +1,10 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from Tracer import WindField, solver, initial_velocity, initial_spin_rate
+from Tracer import WindField, initial_velocity, initial_spin_rate
+from Tracer.RK45 import solver_rk45
+
+solver = solver_rk45
 
 # Data from tour averages for the men's (PGA) and women's (LPGA) golf turnaments
 # from https://www.trackman.com/blog/golf/introducing-updated-tour-averages
@@ -64,7 +67,7 @@ df_lpga['Club Speed (mph)'] = df_lpga['Club Speed (mph)'] * 0.44704
 df_lpga = df_lpga.rename(columns={'Club Speed (mph)':'Club Speed (m/s)'})
 
 directions = [0, 45, 90, 75, 180]#, [*range(0, 360, 45)]
-DT = 0.01
+DT = None
 
 def calculate_trajectory_metrics(df, wind_profile):
     """Calculate carry and max height for all clubs in dataframe."""
