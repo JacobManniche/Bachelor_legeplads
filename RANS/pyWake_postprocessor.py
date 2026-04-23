@@ -18,9 +18,9 @@ def process_rans(file, res=10.0, xyz=(256,256,100)):
     ds = xr.open_dataset(file)
 
     # Create new cartesian grid based on the bounds and resolution
-    x_vec = np.arange(-xyz[0], xyz[1] + res, res)
-    y_vec = np.arange(-xyz[0], xyz[1] + res, res)
-    z_vec = np.arange(-xyz[2], xyz[2] + res, res)
+    x_vec = np.arange(-xyz[0], xyz[0] + res, res)
+    y_vec = np.arange(-xyz[1], xyz[1] + res, res)
+    z_vec = np.arange(0, xyz[2] + res, res)
 
     # 3D grid points
     X, Y, Z = np.meshgrid(x_vec, y_vec, z_vec, indexing='ij')
@@ -84,6 +84,7 @@ def process_rans(file, res=10.0, xyz=(256,256,100)):
     )
 
     ds_cart.attrs = ds.attrs
+    ds_cart.attrs['resolution'] = res
 
     ds_cart.to_netcdf('flow_gaussian_cartesian.nc')
 
