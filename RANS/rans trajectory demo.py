@@ -21,8 +21,12 @@ shot_spin = 2545        # initial spin
 spin_axis = 1.25
 
 # initialize the rans field
-infile = r'RANS\flow_gausshigh_cartesian.nc'
+infile = r'RANS/flow_gaussian_cartesian.nc'
 dataset = xr.open_dataset(infile)
+
+# 
+infile = r'RANS/flowdata_terrain_mb.nc'
+dataset_raw = xr.open_dataset(infile)
 
 # trajectory with log wind
 rans_wind = WindField(nx=nx, ny=ny, nz=nz, profile='rans',dataset=dataset)
