@@ -80,5 +80,5 @@ def visualize_wind_field(file):
 	plt.show()
 
 if __name__ == "__main__":
-	file = 'temp/flow_gaussian_cartesian.nc'
+	file = 'RANS/flowdata_terrain_mb.nc'
 	visualize_wind_field(file)

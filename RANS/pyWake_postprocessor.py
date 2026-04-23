@@ -1,0 +1,106 @@
+
+import numpy as np
+import xarray as xr
+import os
+
+from py_wake_ellipsys.wind_farm_models.ellipsys import EllipSys
+from pyellipsys.inversemap import InverseMap
+
+def process_rans(file, curvelinear=False, res=10.0):
+    """
+    Post-process RANS data to create a cartesian grid netcdf file.
+    Parameters:
+    - file: Path to the input RANS netcdf file.
+    - curvelinear: Boolean indicating if the input grid is curvilinear (default: False).
+    - res: Resolution in meters for the new cartesian grid (default: 10.0). Only used if curvelinear is True.
+    """
+    # 2. Open the dataset
+    ds = xr.open_dataset(file)
+
+    if curvelinear:
+        # Extract bounds dynamically from the RANS dataset
+        x_min, x_max = float(ds['x'].min()), float(ds['x'].max())
+        y_min, y_max = float(ds['y'].min()), float(ds['y'].max())
+        z_min, z_max = float(ds['z'].min()), float(ds['z'].max())
+
+        # Create new cartesian grid based on the bounds and resolution
+        x_vec = np.arange(x_min, x_max + res, res)
+        y_vec = np.arange(y_min, y_max + res, res)
+        z_vec = np.arange(z_min, z_max + res, res)
+    else:
+        # If the grid is already cartesian, we can directly use the coordinates
+        x_vec = ds['x'].values
+        y_vec = ds['y'].values
+        z_vec = ds['z'].values
+
+    # 3D grid points
+    X, Y, Z = np.meshgrid(x_vec, y_vec, z_vec, indexing='ij')
+    n_points = X.size 
+
+    points = np.zeros((n_points, 3)) # Create a 3D array to hold the flattened points
+    points[:, 0] = X.flatten()
+    points[:, 1] = Y.flatten()
+    points[:, 2] = Z.flatten()
+
+    # Remap everything to cartesian grid using InverseMap
+    IM = InverseMap()
+    Ui_flat = IM.interp(ds['x'], ds['y'], ds['z'], ds['U'], points[:, 0], points[:, 1], points[:, 2],
+                    add_ghost_layer=False)
+    Vi_flat = IM.interp(ds['x'], ds['y'], ds['z'], ds['V'], points[:, 0], points[:, 1], points[:, 2],
+                    add_ghost_layer=False, make_inversemap=False, locate_points=False)
+    Wi_flat = IM.interp(ds['x'], ds['y'], ds['z'], ds['W'], points[:, 0], points[:, 1], points[:, 2],
+                    add_ghost_layer=False, make_inversemap=False, locate_points=False)
+    Pi_flat = IM.interp(ds['x'], ds['y'], ds['z'], ds['P'], points[:, 0], points[:, 1], points[:, 2],
+                    add_ghost_layer=False, make_inversemap=False, locate_points=False)
+    muT_flat = IM.interp(ds['x'], ds['y'], ds['z'], ds['muT'], points[:, 0], points[:, 1], points[:, 2],
+                        add_ghost_layer=False, make_inversemap=False, locate_points=False)
+    tke_flat = IM.interp(ds['x'], ds['y'], ds['z'], ds['tke'], points[:, 0], points[:, 1], points[:, 2],
+                        add_ghost_layer=False, make_inversemap=False, locate_points=False)
+    epsilon_flat = IM.interp(ds['x'], ds['y'], ds['z'], ds['epsilon'], points[:, 0], points[:, 1], points[:, 2],
+                            add_ghost_layer=False, make_inversemap=False, locate_points=False)
+
+
+    shape = X.shape # take the shape of the 3D grid for reshaping
+    
+    # Reshape to 3D arrays
+    U_3d = Ui_flat.reshape(shape)
+    V_3d = Vi_flat.reshape(shape)
+    W_3d = Wi_flat.reshape(shape)
+    P_3d = Pi_flat.reshape(shape)
+    muT_3d = muT_flat.reshape(shape)
+    tke_3d = tke_flat.reshape(shape)
+    epsilon_3d = epsilon_flat.reshape(shape)
+
+    ds_cart = xr.Dataset(
+        coords={
+            'x': x_vec,
+            'y': y_vec,
+            'z': z_vec
+        },
+        data_vars={
+            'U': (['x', 'y', 'z'], U_3d),
+            'V': (['x', 'y', 'z'], V_3d),
+            'W': (['x', 'y', 'z'], W_3d),
+            'P': (['x', 'y', 'z'], P_3d),
+            'muT': (['x', 'y', 'z'], muT_3d),
+            'tke': (['x', 'y', 'z'], tke_3d),
+            'epsilon': (['x', 'y', 'z'], epsilon_3d)
+        }
+    )
+
+    ds_cart.attrs = ds.attrs
+
+    ds_cart.to_netcdf('flow_gaussian_cartesian.nc')
+
+    return ds_cart
+
+if __name__ == "__main__":
+    
+    # Post process the RANS data to create a cartesian grid netcdf from curvilinear grid data
+    file = os.path.abspath('../nc files/flowdata_terrain_mb.nc')
+    process_rans(file, curvelinear=True, res=10.0)
+
+    # Post process the RANS data to create a cartesian grid netcdf from already cartesian grid data
+    file = os.path.abspath('../nc files/flowdata_mb.nc')
+    process_rans(file, curvelinear=False, res=10.0)
+
