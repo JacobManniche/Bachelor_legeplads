@@ -18,9 +18,9 @@ def process_rans(file, res=10.0, xyz=(256,256,100)):
     ds = xr.open_dataset(file)
 
     # Create new cartesian grid based on the bounds and resolution
-    x_vec = np.arange(-xyz[0], xyz[0] + res, res)
-    y_vec = np.arange(-xyz[1], xyz[1] + res, res)
-    z_vec = np.arange(0, xyz[2] + res, res)
+    x_vec = np.arange(-xyz[0], xyz[1]+res, res)
+    y_vec = np.arange(-xyz[0], xyz[1]+res, res)
+    z_vec = np.arange(1, xyz[2]+1)
 
     # 3D grid points
     X, Y, Z = np.meshgrid(x_vec, y_vec, z_vec, indexing='ij')
@@ -39,18 +39,24 @@ def process_rans(file, res=10.0, xyz=(256,256,100)):
 
     # Remap everything to cartesian grid using InverseMap
     IM = InverseMap()
+    print('Interpreting...')
     Ui_flat = IM.interp(ds['x'], ds['y'], ds['z'], ds['U'], points[:, 0], points[:, 1], points[:, 2],
                     add_ghost_layer=False)
+
     Vi_flat = IM.interp(ds['x'], ds['y'], ds['z'], ds['V'], points[:, 0], points[:, 1], points[:, 2],
                     add_ghost_layer=False, make_inversemap=False, locate_points=False)
+
     Wi_flat = IM.interp(ds['x'], ds['y'], ds['z'], ds['W'], points[:, 0], points[:, 1], points[:, 2],
                     add_ghost_layer=False, make_inversemap=False, locate_points=False)
+
     Pi_flat = IM.interp(ds['x'], ds['y'], ds['z'], ds['P'], points[:, 0], points[:, 1], points[:, 2],
                     add_ghost_layer=False, make_inversemap=False, locate_points=False)
+
     muT_flat = IM.interp(ds['x'], ds['y'], ds['z'], ds['muT'], points[:, 0], points[:, 1], points[:, 2],
                         add_ghost_layer=False, make_inversemap=False, locate_points=False)
     tke_flat = IM.interp(ds['x'], ds['y'], ds['z'], ds['tke'], points[:, 0], points[:, 1], points[:, 2],
                         add_ghost_layer=False, make_inversemap=False, locate_points=False)
+
     epsilon_flat = IM.interp(ds['x'], ds['y'], ds['z'], ds['epsilon'], points[:, 0], points[:, 1], points[:, 2],
                             add_ghost_layer=False, make_inversemap=False, locate_points=False)
 
@@ -94,9 +100,5 @@ if __name__ == "__main__":
     
     # Post process the RANS data to create a cartesian grid netcdf from curvilinear grid data
     file = os.path.abspath('../nc files/flowdata_terrain_mb.nc')
-    process_rans(file, res=10.0)
-
-    # Post process the RANS data to create a cartesian grid netcdf from already cartesian grid data
-    file = os.path.abspath('../nc files/flowdata_mb.nc')
     process_rans(file, res=10.0)
 

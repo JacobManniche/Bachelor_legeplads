@@ -14,7 +14,7 @@ def visualize_wind_field(file):
 	U = ds.U.values * 8
 	V = ds.V.values * 8
 	W = ds.W.values * 8
-	T = (U**2 + V**2 + W**2)**0.5  # Total velocity magnitude
+	T = ds.tke.values * 8 
 	x_vec = ds.x.values
 	y_vec = ds.y.values
 	z_vec = ds.z.values
@@ -28,10 +28,10 @@ def visualize_wind_field(file):
 
 	# 3. Create the initial plot.
 	X, Y = np.meshgrid(x_vec, y_vec)
-	meshU = ax[0, 0].pcolormesh(X, Y, U[:, :, initial_idx].T, shading='auto', cmap='viridis')
-	meshV = ax[0, 1].pcolormesh(X, Y, V[:, :, initial_idx].T, shading='auto', cmap='viridis')
-	meshW = ax[1, 0].pcolormesh(X, Y, W[:, :, initial_idx].T, shading='auto', cmap='viridis')
-	meshT = ax[1, 1].pcolormesh(X, Y, T[:, :, initial_idx].T, shading='auto', cmap='viridis')
+	meshU = ax[0, 0].pcolormesh(X, Y, U[:, :, initial_idx].T, shading='auto', cmap='viridis', vmin=0, vmax=15)
+	meshV = ax[0, 1].pcolormesh(X, Y, V[:, :, initial_idx].T, shading='auto', cmap='viridis', vmin=0, vmax=15)
+	meshW = ax[1, 0].pcolormesh(X, Y, W[:, :, initial_idx].T, shading='auto', cmap='viridis', vmin=0, vmax=15)
+	meshT = ax[1, 1].pcolormesh(X, Y, T[:, :, initial_idx].T, shading='auto', cmap='viridis', vmin=0, vmax=15)
 
 	# Add formatting.
 	plt.colorbar(meshU, ax=ax[0, 0], label='Velocity $U$ [m/s]')
@@ -58,7 +58,7 @@ def visualize_wind_field(file):
 	slice_slider = Slider(
 		ax=slider_ax,
 		label='z slice',
-		valmin=0,
+		valmin=1,
 		valmax=len(z_vec) - 1,
 		valinit=initial_idx,
 		valstep=1,
@@ -80,5 +80,5 @@ def visualize_wind_field(file):
 	plt.show()
 
 if __name__ == "__main__":
-	file = 'RANS/flowdata_terrain_mb.nc'
+	file = 'RANS/flow_flat_2m_2m.nc'
 	visualize_wind_field(file)
