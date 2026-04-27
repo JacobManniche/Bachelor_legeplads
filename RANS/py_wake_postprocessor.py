@@ -6,14 +6,18 @@ import os
 from py_wake_ellipsys.wind_farm_models.ellipsys import EllipSys
 from pyellipsys.inversemap import InverseMap
 
-def process_rans(file, res=10.0, xyz=(256,256,100)):
+def process_rans(file, res=10.0, xyz=(256,256,100), filename=None):
     """
     Post-process RANS data to create a cartesian grid netcdf file.
     Parameters:
     - file: Path to the input RANS netcdf file.
     - res: Resolution in meters for the new cartesian grid (default: 10.0).
     - xyz: Tuple specifying the dimensions of the cartesian grid (default: (256,256,100)).
+    - filename: Optional name for the output cartesian netcdf file. If None, it will be generated from the input filename.
     """
+    if filename is None:
+        filename = os.path.splitext(os.path.basename(file))[0] + '_cartesian.nc'
+
     # 2. Open the dataset
     ds = xr.open_dataset(file)
 
@@ -92,8 +96,8 @@ def process_rans(file, res=10.0, xyz=(256,256,100)):
     ds_cart.attrs = ds.attrs
     ds_cart.attrs['resolution'] = res
 
-    ds_cart.to_netcdf('flow_gaussian_cartesian.nc')
-
+    ds_cart.to_netcdf(filename)
+    print(f"Cartesian grid netcdf file '{filename}' created successfully.")
     return ds_cart
 
 if __name__ == "__main__":

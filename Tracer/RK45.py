@@ -4,7 +4,7 @@ from Tracer.tracer import acc
 import numpy as np
 from scipy.integrate import solve_ivp
 
-def odesystem(t, y, W_initial, field, decay_rate):
+def odesystem(t, y, W_initial, field: Field, decay_rate):
     # 1. Unpack the state
     P = y[:3]
     V = y[3:]
@@ -14,7 +14,10 @@ def odesystem(t, y, W_initial, field, decay_rate):
     
     # 3. Get Acceleration
     # (Assuming fetch_wind_data and acc are accessible)
-    field_vec = field.get_velocity_at(*P)
+    field_vec = field.get_velocity_at(x=P[0], y=P[1], z=P[2])  # Get local wind velocity vector
+    if np.isnan(field_vec).any():
+        print(f"Warning: NaN in wind field at position {P}. Setting wind to zero.")
+        field_vec = np.zeros(3)  # Fallback to zero wind if interpolation fails
     a = acc(V, W, field_vec)
     
     # 4. Return derivatives: [velocity_x, y, z, acceleration_x, y, z]
@@ -62,6 +65,12 @@ if __name__ == "__main__":
     # Example usage
     V0 = initial_velocity(speed=76.44384, angle=10.4)  # Initial velocity vector
     W0 = initial_spin_rate(spin_rate=2545, spin_axis=1.25)  # Initial spin vector
-    wind = Field(ds='RANS/flow_flat_4m_2m.nc', profile='rans') # Example wind field
-    print(wind.get_velocity_at(10,10,12))
-    #plot_trajectories([solver_rk45(V0, W0, field=wind)])
+    wind_synt = Field(profile='log', direction=0, U_ref=8, z_ref=90, z0=0.03)
+
+    file = '/Users/eskefr/Library/CloudStorage/OneDrive-DanmarksTekniskeUniversitet/6. semester/Bachelor/Github/Bachelor_legeplads/RANS/nc files/flow_flat_2m_2m.nc'
+    wind_rans = Field(ds=file, profile='rans', scale_factor=8)
+
+    print(wind_synt.get_velocity_at(x=0,y=0,z=90))
+    print(wind_rans.get_velocity_at(x=0,y=0,z=101))
+
+    plot_trajectories([solver_rk45(V0, W0,field=wind_rans)])
