@@ -21,9 +21,9 @@ def initial_spin_rate(spin_rate, spin_axis=0):
     # For X-axis flight, pure backspin is around the Y-axis [0, -1, 0]
     # We tilt that Y-axis by the 'spin_axis' angle
     w0 = w_mag * np.array([
-        np.sin(phi),    # X-component (Riflespin)
-        -np.cos(phi),   # Y-component (Backspin/Sidespin)
-        0               # Z-component
+        0,               # X-component
+        -np.cos(phi),   # Y-component (Backspin)
+        np.sin(phi),    # Z-component (Sidespin)
     ])
     
     return w0
