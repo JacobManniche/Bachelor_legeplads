@@ -1,11 +1,11 @@
-from Tracer import WindField, solver, initial_velocity
-from Tracer.tracer import norm, coefficients
+from Tracer.solvers import norm, coefficients
 import numpy as np
 import matplotlib.pyplot as plt
 
 def plot_trajectories(trajectories, plot=True):
     ax = plt.subplots(3, 1, figsize=(10, 8))[1]
-    for t, p, v, w in trajectories:
+    for traj in trajectories:
+        t, p, v, w = traj.traj
         ax[0].plot(p[:, 0], p[:, 2]) # Plot height vs time
         ax[1].plot(p[:, 0], p[:, 1]) # Plot horizontal distance vs time
         ax[2].plot(t, w[:, 1])
@@ -36,7 +36,8 @@ def plot_coefficients(trajectories, plot=True):
     r = 0.0214 # Radius of the golf ball (m)
     
     ax = plt.subplots(2, 2, figsize=(10, 8))[1]
-    for t, p, v, w in trajectories:
+    for traj in trajectories:
+        t, p, v, w = traj.traj
         re = [(norm(v[i]) * (2*r)) / mu for i in range(len(v))] # Reynolds Number calculation
         s = [norm(w[i]) * r / norm(v[i]) if norm(v[i]) > 0 else 0 for i in range(len(v))] # Spin parameter
         cd = [coefficients(norm(v[i]), norm(w[i]))[0] for i in range(len(re))]
@@ -73,23 +74,10 @@ def plot_coefficients(trajectories, plot=True):
         return ax
 
 if __name__ == "__main__":
-    P0 = [0,0,0]
-    wind = WindField(nx=30, ny=150, nz=50, direction= 90, profile='log', U_ref=0 , z0=0.003)
-
-    V0 = initial_velocity(speed=46, angle=20.4) 
-    W0 = np.array([3, -8545, 5])
-    # t1 = solver(P0, V0, W0, wind, dt=0.01)
-    # V0 = initial_velocity(speed=46, angle=23.4) 
-    # W0 = np.array([0, -9300, 0])
-    # t2 = solver(P0, V0, W0, wind, dt=0.01)
-    
-    # trajectories = [t1, t2]
-    # # plot_trajectory(trajectories)
-    # # plot_coefficients(trajectories)
-
+    from .tracer import Trajectory
     t = []
     for decay in [0.05, 0.1, 0.2, 1]:
-        t.append(solver(P0, V0, W0, wind, dt=0.01, decay_rate=decay))
+        t.append(Trajectory(76, 12, 2000, 1.2).solve())
     plot_trajectories(t)
     plot_coefficients(t)
 
