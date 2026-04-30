@@ -6,13 +6,14 @@ import os
 from py_wake_ellipsys.wind_farm_models.ellipsys import EllipSys
 from pyellipsys.inversemap import InverseMap
 
-def process_rans(file, res=10.0, xyz=(256,256,100), filename=None):
+def process_rans(file, res=10.0, size=(512,512,100), filename=None):
     """
     Post-process RANS data to create a cartesian grid netcdf file.
     Parameters:
     - file: Path to the input RANS netcdf file.
-    - res: Resolution in meters for the new cartesian grid (default: 10.0).
-    - xyz: Tuple specifying the dimensions of the cartesian grid (default: (256,256,100)).
+    - res: Resolution in meters for the new x-y plane (default: 10.0).
+    - size: Tuple specifying the size in each direction of x,y of the cartesian grid and size from 0 of z (default: (512,512,100)).
+        - z will be logarithmically spaced from 0.1 to 100 meters with size[2] points.
     - filename: Optional name for the output cartesian netcdf file. If None, it will be generated from the input filename.
     """
     if filename is None:
@@ -22,9 +23,9 @@ def process_rans(file, res=10.0, xyz=(256,256,100), filename=None):
     ds = xr.open_dataset(file)
 
     # Create new cartesian grid based on the bounds and resolution
-    x_vec = np.arange(-xyz[0], xyz[1]+res, res)
-    y_vec = np.arange(-xyz[0], xyz[1]+res, res)
-    z_vec = np.arange(1, xyz[2]+1)
+    x_vec = np.arange(-size[0]//2, size[0]//2+res, res)
+    y_vec = np.arange(-size[1]//2, size[1]//2+res, res)
+    z_vec = np.logspace(-1, 2, num=size[2], base=10)  # Logarithmic spacing in z to capture near-ground details
 
     # 3D grid points
     X, Y, Z = np.meshgrid(x_vec, y_vec, z_vec, indexing='ij')
