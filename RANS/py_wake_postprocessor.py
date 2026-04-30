@@ -35,7 +35,10 @@ def process_rans(file, res=10.0, size=(512,512,100), filename=None):
     print(f"Target grid size: {X.shape}")
     print(f"Total points per variable: {X.size:,}")
     if X.size > 10_000_000:
-        raise ValueError("The target grid is too large. Consider increasing the resolution or using a smaller domain.")
+        ans = input(f"The target grid has {X.size:,} points, which may lead to long processing times and high memory usage. Do you want to proceed? (y/n): ")
+        if ans.lower() != 'y':
+            print("Aborting processing.")
+            return None
 
     points = np.zeros((n_points, 3)) # Create a 3D array to hold the flattened points
     points[:, 0] = X.flatten()

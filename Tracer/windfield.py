@@ -1,125 +1,138 @@
 import numpy as np
+import xarray as xr
+from scipy.interpolate import RegularGridInterpolator
 
 class WindField:
-    def __init__(self, nx=500, ny=500, nz=100, direction=0, profile="log", U_ref=10.0, z0=0.03, dataset=None):
+    def __init__(self, profile="log", ds=None, **kwargs):
         """
-        Synthetic simulation params:
-
-        nx, ny, nz : int
-            Grid size in x, y, z directions
-        direction : float
-            Wind direction in degrees (0 is from the south to north)
         profile : str
-            Type of wind profile ("log" or "uniform")
-        U_ref : float
-            Reference wind speed (m/s) at 10 meters above ground
-        z_ref : float
-            Reference height for log profile (m)
-        z0 : float
-            Surface roughness length (m)
-        
-        RANS simulation params:
-
-        dataset : xarray.Dataset
-            Must contain variables U, V, W, x, y, z, tke
-        """
-        self.profile = profile
-
-        if profile =="rans":
-            
-            self.ds = dataset
-            self.nx = dataset.sizes["x"]
-            self.ny = dataset.sizes["y"]
-            self.nz = dataset.sizes["z"]
-
-            self.x_coords = dataset["x"].values
-            self.y_coords = dataset["y"].values
-            self.z_coords = dataset["z"].values
-
-            # TKE SKAL TAGES DIREKTE FRA FILEN, SÅ DEN SKAL HUSKES I INVERSEMAP!
-            self.tke = 0
-
-        if profile in ["log", "uniform"]:  
-
-            # Constants
-            kappa = 0.4 # Von Karman constant
-            zRef = 10   # reference height for wind speed measurement (usually 10 meters)
-
-            self.nx = nx
-            self.ny = ny
-            self.nz = nz
-            
-            # Initialize arrays
-            self.velocity = np.zeros((nx, ny, nz, 3), dtype=np.float32)  # u, v, w
-            self.tke = np.zeros((nx, ny, nz), dtype=np.float32)
-            
-            # Coordinates
-            x = np.arange(nx)
-            y = np.arange(ny)
-            z = np.arange(nz)
-            X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
-            
-            # Initialize velocity based on profile
-            if profile == "uniform":
-                U = np.full((nx, ny, nz), U_ref, dtype=np.float32)
-            elif profile == "log":
-                # Avoid log(0) by ensuring z > z0
-                Z_safe = np.maximum(Z, z0 + 1e-6)
-                u_star= U_ref*(kappa) / (np.log(zRef/z0))
-                U = (u_star / kappa) * np.log(Z_safe / z0)
-            else:
-                raise ValueError("Unsupported profile type. Use 'uniform' or 'log'.")
-        
-            # Assign velocity components
-
-            angle = np.radians(direction)  # Convert direction to radians
-
-            self.velocity[..., 0] = U * np.cos(angle)   # u-component
-            self.velocity[..., 1] = U * np.sin(angle)   # v-component
-            self.velocity[..., 2] = 0   # w-component
-            
-            # Simple TKE model
-            self.tke = 0.1 * (self.velocity[..., 0]**2) * np.exp(-Z / 50)
-
-    def get_point(self, i, j, k):
-        """
-        Return velocity vector and TKE at grid index (i, j, k)
-        (same interface as WindField)
+            Type of wind field to create. Options: 'log', 'uniform', 'rans'.
+        ds : xarray.Dataset
+            RANS dataset containing coordinates 'x', 'y', 'z'
+            and variables 'U', 'V', 'W', 'tke'.
+        kwargs : dict
+            Additional parameters for synthetic profiles (direction, U_ref, z0)
         """
 
-        if self.profile == 'rans':
-
-            x = self.x_coords[i]
-            y = self.y_coords[j]
-            z = self.z_coords[k]
-
-            ds_point = self.ds.sel(x=x, y=y, z=z, method="nearest")
-
-            U = ds_point["U"].item()
-            V = ds_point["V"].item()
-            W = ds_point["W"].item()
-
-            velocity = np.array([U, V, W], dtype=np.float32)
-
-            # Placeholder TKE
-            tke = 0.5 * (U**2 + V**2 + W**2) * 0.1
-
-            return {
-                "velocity": velocity,
-                "tke": tke
-            }
+        # make sure profile is lowercase for consistency
+        self.profile = profile.lower()
         
-        if self.profile in ["log", "uniform"]:
-        
-            return {
-                "velocity": self.velocity[i, j, k],
-                "tke": self.tke[i, j, k]
-            }
+        if self.profile == "rans" or ds is not None:
+            # If a dataset is provided, we use U_ref as a scaling factor to adjust the wind speeds, defaulting to 8 m/s if not specified
+            self.from_rans(ds, scale_factor=kwargs.get('U_ref', 8.0))
+
+        elif self.profile in ["log", "uniform"]:
+            self.synthesize(**kwargs)
+
         else:
-            raise ValueError("Profile issue.")
+            raise ValueError("Must provide a valid profile type and/or dataset.")
 
-    def set_velocity(self, field):
-        self.velocity = field
+        self._setup_interpolators()
+        
+    def _setup_interpolators(self):
+        if self.profile == 'uniform':
+            # Store static vector for O(1) lookup
+            self._static_wind = np.array([self.ds.U.values[0], self.ds.V.values[0], self.ds.W.values[0]])
+            return
 
-    def set_tke(self, field):
-        self.tke = field
+        # Extract coordinates and data for interpolation
+        coords = [self.ds[dim].values for dim in self.ds.dims]
+        
+        # Combined U, V, W into one array for a single lookup pass
+        combined_data = np.stack([self.ds.U.values, self.ds.V.values, self.ds.W.values, self.ds.tke.values], axis=-1)
+        
+        self.interpolator = RegularGridInterpolator(
+            coords, 
+            combined_data, 
+            method='linear', 
+            bounds_error=False, 
+            fill_value=0 
+        )
+
+    def synthesize(self, z_height=100, direction=0, U_ref=10.0, z0=0.03, z_ref = 10.0):
+        """Constructor for Log or Uniform profiles."""
+        # Generate vertical grid (logarithmically spaced for better resolution near the ground)
+        # always start at 0.1m to avoid log(0) issues, and go up to 100m which is a typical max height for golf ball trajectories
+        
+        # Create 3D mesh for the vertical profile
+        # Velocity only changes with Z in synthetic profiles
+
+        if self.profile == "uniform":
+            z = np.array([z_ref])
+            z_mag = np.array([U_ref])
+        elif self.profile == "log":
+
+            z = np.logspace(-1, np.log10(z_height), num=z_height)
+            # NB: no need for kappa in the calculation since it cancels out
+            u_star = U_ref / np.log(z_ref / z0)
+            
+            z_mag = u_star * np.log(z / z0)
+        
+        angle = np.radians(direction)
+
+        self.ds = xr.Dataset(
+            data_vars={
+                'U': (['z'], z_mag * np.cos(angle)),
+                'V': (['z'], z_mag * np.sin(angle)),
+                'W': (['z'], np.zeros_like(z_mag)),
+                'tke': (['z'], 0.1 * (z_mag**2) * np.exp(-z / 50))
+            },
+            coords={'z': z}
+        )
+
+    def from_rans(self, path_or_ds, scale_factor=8):
+        """Constructor for existing Cartesian RANS NetCDF files."""
+        if isinstance(path_or_ds, str):
+            ds = xr.open_dataset(path_or_ds)
+        else:
+            ds = path_or_ds
+
+        ds['U'] *= scale_factor
+        ds['V'] *= scale_factor
+        ds['W'] *= scale_factor
+        self.ds = ds
+
+    def get_velocity_at(self,**kwargs):
+        """
+        Interpolates the wind field at an arbitrary spatial point.
+        Returns a dict with velocity vector and tke.
+            - kwargs should be in the form of (x=..., y=..., z=...)
+            - method can be 'linear', 'nearest', etc. (xarray interpolation methods)
+        """
+        # if uniform always return the same value, no need to interpolate
+        if self.profile == 'uniform':
+            return self._static_wind
+        
+        # for log profile we only need to interpolate in the vertical direction since it's horizontally uniform
+        elif self.profile == 'log':
+            return self.interpolator([kwargs['z']])[0, :3]
+        
+        # for RANS we need to interpolate in all three dimensions, xarray's .interp can handle that
+        elif self.profile == 'rans':
+            return self.interpolator([kwargs['x'], kwargs['y'], kwargs['z']])[0, :3]
+    
+    def get_tke_at(self, **kwargs):
+        return float(self.interpolator([kwargs['x'], kwargs['y'], kwargs['z']])[0, 3])
+    
+    def __repr__(self):
+        # Simple representation showing profile type and dataset summary
+        return f"WindField(profile={self.profile}) \n {self.ds})"
+
+# --- Usage Example ---
+if __name__ == "__main__":
+    from Tracer import Trajectory
+    # 1. Create a synthetic log profile
+    sim_field = WindField(profile="log", direction=0, U_ref=8, z_ref=90, z0=0.03)
+
+    cond = {'ball_speed': 76.4, 'launch_angle': 10.4, 'spin_rate': 2545, 'spin_axis': 1.25}
+
+    traj = Trajectory(**cond, wind=sim_field)
+    traj.solve()
+    traj.plot()
+
+    #3. Load from your Cartesian NetCDF
+    rans_wind = WindField(ds = '../RANS/nc files/flowdata_2m_cartesian.nc', profile='rans', U_ref=8)
+    traj = Trajectory(**cond, wind=rans_wind)
+    traj.solve()
+    traj.plot()
+    
