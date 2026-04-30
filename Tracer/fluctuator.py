@@ -1,4 +1,4 @@
-from field import Field
+from windfield import WindField 
 import numpy as np
 
 def gust_simple(wind,tke,rng,cf=0.1):
@@ -19,12 +19,11 @@ def gust_OU(wind, tke, gust_old, rng, dt=0.01, Tg=0.3, cf=0.1):                 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
-    sim_field = Field(profile="log", direction=0, U_ref=6, z_ref=10, z0=0.03)
-
-    point = [0, 0, 2]
+    sim_field = WindField(profile="log", direction=0, U_ref=6, z_ref=10, z0=0.03)
+    point = np.array([1, 1, 1])
 
     wind = np.array(sim_field.get_velocity_at(x=point[0], y=point[1], z=point[2]), dtype=float)
-    tke = sim_field.get_tke_at(x=point[0], y=point[1], z=point[2])
+    tke = sim_field.get_tke_at(x=point[0], y=point[1], z=point[2], dtype=float)
 
     rng = np.random.default_rng(42)
 
@@ -44,9 +43,7 @@ if __name__ == "__main__":
         ou_wind, gust_state = gust_OU(wind, tke, gust_state, rng)
         ou_hist[i] = ou_wind
 
-    # -----------------------------
-    # PLOTTING
-    # -----------------------------
+    # Plotting
     fig, axs = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
 
     labels = ['u-component', 'v-component', 'w-component']
@@ -63,5 +60,3 @@ if __name__ == "__main__":
     plt.suptitle('Comparison of Simple Gaussian Gust vs Ornstein-Uhlenbeck Gust')
     plt.tight_layout()
     plt.show()
-
-    print(simple_hist[0:10,0])
