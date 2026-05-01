@@ -39,7 +39,7 @@ class WindField:
         coords = [self.ds[dim].values for dim in self.ds.dims]
         
         # Combined U, V, W into one array for a single lookup pass
-        combined_data = np.stack([self.ds.U.values, self.ds.V.values, self.ds.W.values, self.ds.tke.values], axis=-1)
+        combined_data = np.stack([self.ds.U.values, self.ds.V.values, self.ds.W.values, self.ds.tke.values, self.ds.epsilon.values], axis=-1)
         
         self.interpolator = RegularGridInterpolator(
             coords, 
@@ -64,8 +64,9 @@ class WindField:
 
             z = np.logspace(-1, np.log10(z_height), num=z_height)
             # NB: no need for kappa in the calculation since it cancels out
+            kappa = 0.4
+            Cmu = 0.09
             u_star = U_ref / np.log(z_ref / z0)
-            
             z_mag = u_star * np.log(z / z0)
         
         angle = np.radians(direction)
@@ -75,7 +76,8 @@ class WindField:
                 'U': (['z'], z_mag * np.cos(angle)),
                 'V': (['z'], z_mag * np.sin(angle)),
                 'W': (['z'], np.zeros_like(z_mag)),
-                'tke': (['z'], 0.1 * (z_mag**2) * np.exp(-z / 50))
+                'tke': (['z'], np.full_like(z, u_star**2 / np.sqrt(Cmu))),
+                'epsilon': (['z'], u_star**3 / (kappa * z))
             },
             coords={'z': z}
         )
@@ -114,6 +116,9 @@ class WindField:
     def get_tke_at(self, **kwargs):
         return float(self.interpolator([kwargs['x'], kwargs['y'], kwargs['z']])[0, 3])
     
+    def get_epsilon_at(self, **kwargs):
+        return float(self.interpolator([kwargs['x'], kwargs['y'], kwargs['z']])[0, 4])
+
     def __repr__(self):
         # Simple representation showing profile type and dataset summary
         return f"WindField(profile={self.profile}) \n {self.ds})"
