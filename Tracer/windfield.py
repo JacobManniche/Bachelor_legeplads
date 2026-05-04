@@ -101,13 +101,15 @@ class WindField:
         ds['W'] *= scale_factor
         self.ds = ds
 
-    def get_velocity_at(self,**kwargs):
+    def get_velocity_at(self, *args, **kwargs):
         """
         Interpolates the wind field at an arbitrary spatial point.
         Returns a dict with velocity vector and tke.
             - kwargs should be in the form of (x=..., y=..., z=...)
             - method can be 'linear', 'nearest', etc. (xarray interpolation methods)
         """
+        if len(args) == 3: # assume arguments are x, y, z in order
+            kwargs = {'x': args[0], 'y': args[1], 'z': args[2]}
         # if uniform always return the same value, no need to interpolate
         if self.profile == 'uniform':
             return self._static_wind
@@ -120,11 +122,25 @@ class WindField:
         elif self.profile == 'rans':
             return self.interpolator([kwargs['x'], kwargs['y'], kwargs['z']])[0, :3]
     
-    def get_tke_at(self, **kwargs):
-        return float(self.interpolator([kwargs['x'], kwargs['y'], kwargs['z']])[0, 3])
-    
-    def get_epsilon_at(self, **kwargs):
-        return float(self.interpolator([kwargs['x'], kwargs['y'], kwargs['z']])[0, 4])
+    def get_tke_at(self, *args, **kwargs):
+        if len(args) == 3: # assume arguments are x, y, z in order
+            kwargs = {'x': args[0], 'y': args[1], 'z': args[2]}
+        if self.profile == 'uniform':
+            return self._static_tke
+        elif self.profile == 'log':
+            return float(self.interpolator([kwargs['z']])[0, 3])
+        elif self.profile == 'rans':
+            return float(self.interpolator([kwargs['x'], kwargs['y'], kwargs['z']])[0, 3])
+
+    def get_epsilon_at(self, *args, **kwargs):
+        if len(args) == 3: # assume arguments are x, y, z in order
+            kwargs = {'x': args[0], 'y': args[1], 'z': args[2]}
+        if self.profile == 'uniform':
+            return self._static_epsilon
+        elif self.profile == 'log':
+            return float(self.interpolator([kwargs['z']])[0, 4])
+        elif self.profile == 'rans':
+            return float(self.interpolator([kwargs['x'], kwargs['y'], kwargs['z']])[0, 4])
 
     def __repr__(self):
         # Simple representation showing profile type and dataset summary
@@ -133,18 +149,18 @@ class WindField:
 # --- Usage Example ---
 if __name__ == "__main__":
     from Tracer import Trajectory
-    # # 1. Create a synthetic log profile
-    # sim_field = WindField(profile="log", direction=0, U_ref=8, z_ref=90, z0=0.03)
+    # 1. Create a synthetic log profile
+    sim_field = WindField(profile="log", direction=0, U_ref=8, z_ref=90, z0=0.03)
 
-    # cond = {'ball_speed': 76.4, 'launch_angle': 10.4, 'spin_rate': 2545, 'spin_axis': 1.25}
+    cond = {'ball_speed': 76.4, 'launch_angle': 10.4, 'spin_rate': 2545, 'spin_axis': 1.25}
 
-    # traj = Trajectory(**cond, wind=sim_field)
-    # traj.solve()
-    # traj.plot()
+    traj = Trajectory(**cond, wind=sim_field)
+    traj.solve()
+    traj.plot()
 
-    # #3. Load from your Cartesian NetCDF
-    # rans_wind = WindField(ds = '../RANS/nc files/flowdata_2m_cartesian.nc', profile='rans', U_ref=8)
-    # traj = Trajectory(**cond, wind=rans_wind)
-    # traj.solve()
-    # traj.plot()
+    #3. Load from your Cartesian NetCDF
+    rans_wind = WindField(ds = '../RANS/nc files/flowdata_2m_cartesian.nc', profile='rans', U_ref=8)
+    traj = Trajectory(**cond, wind=rans_wind)
+    traj.solve()
+    traj.plot()
     
