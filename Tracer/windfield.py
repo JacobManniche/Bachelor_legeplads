@@ -53,30 +53,25 @@ class WindField:
 
     def synthesize(self, z_height=100, direction=0, U_ref=10.0, z0=0.03, z_ref = 10.0):
         """Constructor for Log or Uniform profiles."""
-        # Generate vertical grid (logarithmically spaced for better resolution near the ground)
-        # always start at 0.1m to avoid log(0) issues, and go up to 100m which is a typical max height for golf ball trajectories
-        
-        # Create 3D mesh for the vertical profile
-        # Velocity only changes with Z in synthetic profiles
-
+        print("Synthesizing wind field with parameters: ", f"z_height={z_height}, direction={direction}, U_ref={U_ref}, z0={z0}, z_ref={z_ref}")
         # Needed for log profile, and for calculating tke and epsilon
-        # NB: no need for kappa in the calculation since it cancels out
         kappa = 0.4
         Cmu = 0.09
-        u_star = U_ref / np.log(z_ref / z0)
+        u_star = U_ref * kappa / np.log(z_ref / z0)
 
         if self.profile == "uniform":
             z = np.array([z_ref])
             z_mag = np.array([U_ref])
         elif self.profile == "log":
             z = np.logspace(-1, np.log10(z_height), num=z_height)
-            z_mag = u_star * np.log(z / z0)
+            z_mag = u_star/kappa * np.log(z / z0)
 
         
         angle = np.radians(direction)
 
         tke = u_star**2 / np.sqrt(Cmu)
         eps = Cmu**(3/4)*tke**(3/2) / (kappa * z)
+        eps = u_star**3 / (kappa * z)  # Simplified epsilon estimate based on u_star and height
 
         self.ds = xr.Dataset(
             data_vars={
@@ -99,52 +94,56 @@ class WindField:
         ds['U'] *= scale_factor
         ds['V'] *= scale_factor
         ds['W'] *= scale_factor
+        ds['tke'] *= scale_factor
+        ds['epsilon'] *= scale_factor
+        ds.attrs['scaling'] = scale_factor
         self.ds = ds
+
+    def get_profile_at(self, *args, **kwargs):
+        """
+        Returns the full profile (velocity vector, tke, epsilon) at a given point.
+            - kwargs should be in the form of (x=..., y=..., z=...)
+        """
+        if len(args) == 3: # assume arguments are x, y, z in order
+            kwargs = {'x': args[0], 'y': args[1], 'z': args[2]}
+        if self.profile == 'uniform':
+            return self._static_wind, self._static_tke, self._static_epsilon
+        
+        elif self.profile == 'log':
+            result = self.interpolator([kwargs['z']])[0]
+            return result[:3], result[3], result[4]  # velocity, tke, epsilon
+
+        elif self.profile == 'rans':
+            result = self.interpolator([kwargs['x'], kwargs['y'], kwargs['z']])[0]
+            return result[:3], result[3], result[4]  # velocity, tke, epsilon
 
     def get_velocity_at(self, *args, **kwargs):
         """
         Interpolates the wind field at an arbitrary spatial point.
-        Returns a dict with velocity vector and tke.
+        Returns a np.array with velocity vector (u,v,w).
             - kwargs should be in the form of (x=..., y=..., z=...)
-            - method can be 'linear', 'nearest', etc. (xarray interpolation methods)
         """
-        if len(args) == 3: # assume arguments are x, y, z in order
-            kwargs = {'x': args[0], 'y': args[1], 'z': args[2]}
-        # if uniform always return the same value, no need to interpolate
-        if self.profile == 'uniform':
-            return self._static_wind
-        
-        # for log profile we only need to interpolate in the vertical direction since it's horizontally uniform
-        elif self.profile == 'log':
-            return self.interpolator([kwargs['z']])[0, :3]
-        
-        # for RANS we need to interpolate in all three dimensions, xarray's .interp can handle that
-        elif self.profile == 'rans':
-            return self.interpolator([kwargs['x'], kwargs['y'], kwargs['z']])[0, :3]
+        return self.get_profile_at(*args, **kwargs)[0] # just call the full profile method since it returns all the info we need
     
     def get_tke_at(self, *args, **kwargs):
-        if len(args) == 3: # assume arguments are x, y, z in order
-            kwargs = {'x': args[0], 'y': args[1], 'z': args[2]}
-        if self.profile == 'uniform':
-            return self._static_tke
-        elif self.profile == 'log':
-            return float(self.interpolator([kwargs['z']])[0, 3])
-        elif self.profile == 'rans':
-            return float(self.interpolator([kwargs['x'], kwargs['y'], kwargs['z']])[0, 3])
+        """
+        Interpolates the turbulent kinetic energy at an arbitrary spatial point.
+        Returns a np.array with tke.
+            - kwargs should be in the form of (x=..., y=..., z=...)
+        """
+        return self.get_profile_at(*args, **kwargs)[1] # just call the full profile method since it returns all the info we need
 
     def get_epsilon_at(self, *args, **kwargs):
-        if len(args) == 3: # assume arguments are x, y, z in order
-            kwargs = {'x': args[0], 'y': args[1], 'z': args[2]}
-        if self.profile == 'uniform':
-            return self._static_epsilon
-        elif self.profile == 'log':
-            return float(self.interpolator([kwargs['z']])[0, 4])
-        elif self.profile == 'rans':
-            return float(self.interpolator([kwargs['x'], kwargs['y'], kwargs['z']])[0, 4])
-
+        """
+        Interpolates the turbulent dissipation rate at an arbitrary spatial point.
+        Returns a np.array with epsilon.
+            - kwargs should be in the form of (x=..., y=..., z=...)
+        """
+        return self.get_profile_at(*args, **kwargs)[2] # just call the full profile method since it returns all the info we need
+            
     def __repr__(self):
         # Simple representation showing profile type and dataset summary
-        return f"WindField(profile={self.profile}) \n {self.ds})"
+        return f"WindField(profile={self.profile}) \n{self.ds})".replace('<xarray.Dataset> ', '')
 
 # --- Usage Example ---
 if __name__ == "__main__":
