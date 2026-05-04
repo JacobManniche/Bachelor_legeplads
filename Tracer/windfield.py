@@ -31,8 +31,10 @@ class WindField:
         
     def _setup_interpolators(self):
         if self.profile == 'uniform':
-            # Store static vector for O(1) lookup
+            # Store static properties for O(1) lookup
             self._static_wind = np.array([self.ds.U.values[0], self.ds.V.values[0], self.ds.W.values[0]])
+            self._static_tke = self.ds.tke.values[0]
+            self._static_epsilon = self.ds.epsilon.values[0]
             return
 
         # Extract coordinates and data for interpolation
@@ -57,27 +59,32 @@ class WindField:
         # Create 3D mesh for the vertical profile
         # Velocity only changes with Z in synthetic profiles
 
+        # Needed for log profile, and for calculating tke and epsilon
+        # NB: no need for kappa in the calculation since it cancels out
+        kappa = 0.4
+        Cmu = 0.09
+        u_star = U_ref / np.log(z_ref / z0)
+
         if self.profile == "uniform":
             z = np.array([z_ref])
             z_mag = np.array([U_ref])
         elif self.profile == "log":
-
             z = np.logspace(-1, np.log10(z_height), num=z_height)
-            # NB: no need for kappa in the calculation since it cancels out
-            kappa = 0.4
-            Cmu = 0.09
-            u_star = U_ref / np.log(z_ref / z0)
             z_mag = u_star * np.log(z / z0)
+
         
         angle = np.radians(direction)
+
+        tke = u_star**2 / np.sqrt(Cmu)
+        eps = Cmu**(3/4)*tke**(3/2) / (kappa * z)
 
         self.ds = xr.Dataset(
             data_vars={
                 'U': (['z'], z_mag * np.cos(angle)),
                 'V': (['z'], z_mag * np.sin(angle)),
                 'W': (['z'], np.zeros_like(z_mag)),
-                'tke': (['z'], np.full_like(z, u_star**2 / np.sqrt(Cmu))),
-                'epsilon': (['z'], u_star**3 / (kappa * z))
+                'tke': (['z'], np.full_like(z, tke)),
+                'epsilon': (['z'], eps)
             },
             coords={'z': z}
         )
@@ -126,18 +133,18 @@ class WindField:
 # --- Usage Example ---
 if __name__ == "__main__":
     from Tracer import Trajectory
-    # 1. Create a synthetic log profile
-    sim_field = WindField(profile="log", direction=0, U_ref=8, z_ref=90, z0=0.03)
+    # # 1. Create a synthetic log profile
+    # sim_field = WindField(profile="log", direction=0, U_ref=8, z_ref=90, z0=0.03)
 
-    cond = {'ball_speed': 76.4, 'launch_angle': 10.4, 'spin_rate': 2545, 'spin_axis': 1.25}
+    # cond = {'ball_speed': 76.4, 'launch_angle': 10.4, 'spin_rate': 2545, 'spin_axis': 1.25}
 
-    traj = Trajectory(**cond, wind=sim_field)
-    traj.solve()
-    traj.plot()
+    # traj = Trajectory(**cond, wind=sim_field)
+    # traj.solve()
+    # traj.plot()
 
-    #3. Load from your Cartesian NetCDF
-    rans_wind = WindField(ds = '../RANS/nc files/flowdata_2m_cartesian.nc', profile='rans', U_ref=8)
-    traj = Trajectory(**cond, wind=rans_wind)
-    traj.solve()
-    traj.plot()
+    # #3. Load from your Cartesian NetCDF
+    # rans_wind = WindField(ds = '../RANS/nc files/flowdata_2m_cartesian.nc', profile='rans', U_ref=8)
+    # traj = Trajectory(**cond, wind=rans_wind)
+    # traj.solve()
+    # traj.plot()
     
