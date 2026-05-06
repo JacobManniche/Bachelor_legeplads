@@ -93,7 +93,7 @@ def hit_ground(t, y, *args):
 hit_ground.terminal = True
 hit_ground.direction = -1
 
-def solver_rk45(V0, W0, P0=np.array([0, 0, 0]), wind=None, dt=0.05, decay_rate=0.05, mt=15, rtol=1e-6):
+def solver_rk45(V0, W0, P0, wind: WindField, dt=0.05, decay_rate=0.05, mt=15, rtol=1e-6):
     """
     Solves the equations of motion for the ball given the initial conditions and parameters using the RK45 method.
     It will return the trajectory of the ball as a function of time.
@@ -101,7 +101,7 @@ def solver_rk45(V0, W0, P0=np.array([0, 0, 0]), wind=None, dt=0.05, decay_rate=0
     - V0: Initial velocity vector (m/s)
     - W0: Initial spin vector (rad/s)
     - P0: Initial position vector (m)
-    - wind: Wind field object that provides the get_velocity_at(x, y, z) method
+    - wind: WindField object that provides the get_velocity_at(x, y, z) method
     - dt: Time step for the solver (used for t_eval, can be set to None for adaptive time steps)
     - decay_rate: Decay rate for spin (default: 0.05)
     - mt: Max time for the solver to run (default: 15 seconds)
@@ -115,9 +115,6 @@ def solver_rk45(V0, W0, P0=np.array([0, 0, 0]), wind=None, dt=0.05, decay_rate=0
     # Similar setup as above but with fixed time steps
     # Initial state: Combine P0 and V0
     y0 = np.concatenate([P0, V0])
-
-    if wind is None:
-        wind = WindField(direction=45, profile='log', z0=0.003, U_ref=6) # default wind wind if none provided
 
     t_requested = np.arange(0, mt + dt, dt) if dt else None
 
@@ -140,16 +137,13 @@ def solver_rk45(V0, W0, P0=np.array([0, 0, 0]), wind=None, dt=0.05, decay_rate=0
 
     return t_steps, positions, velocities, spin_rates
 
-def solver_euler(V0, W0, P0=np.array([0, 0, 0]), wind=None, dt=0.01, decay_rate=0.05):
+def solver_euler(V0, W0, P0, wind: WindField, dt=0.01, decay_rate=0.05):
     # This function will solve the equations of motion for the ball given the initial conditions and parameters
     # It will return the trajectory of the ball as a function of time
     t = [0]
     P = [P0] # position array
     V = [V0]
     W = [W0] # initial angular velocity (rad/s)
-
-    if wind is None:
-        wind = WindField(profile='log') # default wind wind if none provided
 
     while P[-1][2] >= 0: # while the ball is above the ground
         
