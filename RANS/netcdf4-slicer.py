@@ -28,10 +28,10 @@ def visualize_wind_field(file):
 
 	# 3. Create the initial plot.
 	X, Y = np.meshgrid(x_vec, y_vec)
-	meshU = ax[0, 0].pcolormesh(X, Y, U[:, :, initial_idx].T, shading='auto', cmap='viridis', vmin=0, vmax=15)
-	meshV = ax[0, 1].pcolormesh(X, Y, V[:, :, initial_idx].T, shading='auto', cmap='viridis', vmin=0, vmax=15)
-	meshW = ax[1, 0].pcolormesh(X, Y, W[:, :, initial_idx].T, shading='auto', cmap='viridis', vmin=0, vmax=15)
-	meshT = ax[1, 1].pcolormesh(X, Y, T[:, :, initial_idx].T, shading='auto', cmap='viridis', vmin=0, vmax=15)
+	meshU = ax[0, 0].pcolormesh(X, Y, U[:, :, initial_idx].T, shading='auto', cmap='viridis')
+	meshV = ax[0, 1].pcolormesh(X, Y, V[:, :, initial_idx].T, shading='auto', cmap='viridis')
+	meshW = ax[1, 0].pcolormesh(X, Y, W[:, :, initial_idx].T, shading='auto', cmap='viridis')
+	meshT = ax[1, 1].pcolormesh(X, Y, T[:, :, initial_idx].T, shading='auto', cmap='viridis')
 
 	# Add formatting.
 	plt.colorbar(meshU, ax=ax[0, 0], label='Velocity $U$ [m/s]')
@@ -68,9 +68,13 @@ def visualize_wind_field(file):
 	def update_slice(val):
 		slice_idx = int(slice_slider.val)
 		meshU.set_array(U[:, :, slice_idx].T.ravel())
+		meshU.set_clim(vmin=meshU.get_array().min(), vmax=meshU.get_array().max())
 		meshV.set_array(V[:, :, slice_idx].T.ravel())
+		meshV.set_clim(vmin=meshV.get_array().min(), vmax=meshV.get_array().max())
 		meshW.set_array(W[:, :, slice_idx].T.ravel())
+		meshW.set_clim(vmin=meshW.get_array().min(), vmax=meshW.get_array().max())
 		meshT.set_array(T[:, :, slice_idx].T.ravel())
+		meshT.set_clim(vmin=meshT.get_array().min(), vmax=meshT.get_array().max())
 		title.set_text(f'Wind Velocity at Height: {z_vec[slice_idx]:.2f} m')
 		fig.canvas.draw_idle()
 
@@ -80,5 +84,5 @@ def visualize_wind_field(file):
 	plt.show()
 
 if __name__ == "__main__":
-	file = 'RANS/flow_flat_2m_2m.nc'
+	file = '/Users/eskefr/Library/CloudStorage/OneDrive-DanmarksTekniskeUniversitet/6. semester/Bachelor/Github/Bachelor_legeplads/RANS/nc files/flow_flat_2m_2m.nc'
 	visualize_wind_field(file)

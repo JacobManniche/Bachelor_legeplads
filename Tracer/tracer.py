@@ -1,3 +1,5 @@
+from typing_extensions import Final
+
 import numpy as np
 from Tracer.windfield import WindField
 from Tracer.solvers import solver_rk45, solver_euler
@@ -11,22 +13,15 @@ def initial_velocity(speed, angle):
 def initial_spin_rate(spin_rate, spin_axis=0):
     """Returns the initial spin rate in radians per second given the spin rate in rpm"""
     phi = np.radians(spin_axis)
-    
     # Initial Spin (W0) in rad/s
     w_mag = spin_rate * (2 * np.pi / 60)
     
-    # For X-axis flight, pure backspin is around the Y-axis [0, -1, 0]
-    # We tilt that Y-axis by the 'spin_axis' angle
-    w0 = w_mag * np.array([
-        0,               # X-component
-        -np.cos(phi),   # Y-component (Backspin)
-        np.sin(phi),    # Z-component (Sidespin)
-    ])
-    
-    return w0
+    # For X-axis flight; X: rifle, Y: Backspin, Z: Sidespin 
+    w0 = w_mag *np.array([0,-np.cos(phi), np.sin(phi)])
 
+    return w0
 class Trajectory:
-    def __init__(self, ball_speed, launch_angle, spin_rate, spin_axis=0, P0=np.array([0, 0, 0]), wind=WindField(profile='log')):
+    def __init__(self, ball_speed, launch_angle, spin_rate, spin_axis=0, orientation=0, P0=np.array([0, 0, 0]), wind=None):
         """
         Initializes the Trajectory object with initial conditions and wind field.
         Parameters:
@@ -35,12 +30,34 @@ class Trajectory:
         - spin_rate: Spin rate of the ball in rpm
         - spin_axis: Spin axis angle in degrees (default: 0 for pure backspin)
         - P0: Initial position vector (m)
-        - wind: Wind field object that provides the get_velocity_at(x, y, z)
+        - orientation: Orientation angle in degrees (default: 0)
+        - wind: WindField object that provides the get_velocity_at(x, y, z)
         """
+        self.args = (ball_speed, launch_angle, spin_rate, spin_axis, orientation)
         self.P0 = P0
         self.V0 = initial_velocity(speed=ball_speed, angle=launch_angle)
         self.W0 = initial_spin_rate(spin_rate=spin_rate, spin_axis=spin_axis)
+        if orientation != 0:
+            self.rotate(orientation)
+        if wind is None:
+            print("No wind provided. Using default uniform wind with U_ref=0.")
+            wind = WindField(profile='uniform', U_ref=0)
         self.wind = wind
+
+        self.is_solved = False
+
+    def rotate(self, angle):
+        """Rotates the initial velocity and spin vectors by a given angle in degrees around the Z-axis."""
+        psi = np.radians(angle)
+        Rz = np.array([[np.cos(psi), -np.sin(psi), 0],
+                    [np.sin(psi),  np.cos(psi), 0],
+                    [0,            0,           1]])
+        self.V0 = Rz @ self.V0
+        self.W0 = Rz @ self.W0
+
+        self.is_solved = False
+        
+        return self
 
     def solve(self, solver='rk45', dt=0.01, **kwargs):
         """
@@ -71,18 +88,37 @@ class Trajectory:
         self.w = w
         self.traj = (t, p, v, w)
 
+        self.is_solved = True
+
         return t, p, v, w
 
     def plot(self):
         from Tracer.debug_tools import plot_trajectories
         plot_trajectories([self])
 
+    def animate(self):
+        from Tracer.animate import animate
+        animate(self)
+
+    def __repr__(self):
+        if self.is_solved:
+            return f"Trajectory(ball_speed={self.args[0]}, launch_angle={self.args[1]}, spin_rate={self.args[2]}, spin_axis={self.args[3]}) \nV0={self.V0.round(2)}, \nW0={self.W0.round(2)}, \nP0={self.P0.round(2)}, \nFinal Position={self.p[-1].round(2)}, \Time={self.t[-1]:.2f} s"
+        else:
+            return f"Trajectory(V0={self.V0.round(2)}, W0={self.W0.round(2)}, P0={self.P0.round(2)})"
 
 
 if __name__ == "__main__":
     # Example usage
-    file = '/Users/eskefr/Library/CloudStorage/OneDrive-DanmarksTekniskeUniversitet/6. semester/Bachelor/Github/Bachelor_legeplads/RANS/nc files/flowdata_2m_cartesian.nc'
-    wind = WindField(profile='rans', ds=file)
-    trajectory = Trajectory(ball_speed=76.44384, launch_angle=10.4, spin_rate=2545, spin_axis=1.25)
-    trajectory.solve(solver='euler', dt=0.01)
-    trajectory.plot()
+    # file = '/Users/eskefr/Library/CloudStorage/OneDrive-DanmarksTekniskeUniversitet/6. semester/Bachelor/Github/Bachelor_legeplads/RANS/nc files/flowdata_2m_cartesian.nc'
+    # wind = WindField(profile='rans', ds=file)
+    wind = WindField(profile='uniform', U_ref=10, direction=45)
+    trajectory = Trajectory(ball_speed=76.44384, launch_angle=10.4, spin_rate=2545, spin_axis=0, wind=wind)
+    trajectory.solve(solver='rk45', dt=0.01)
+    trajs = [trajectory]
+    for a in range(7):
+        trajectory.rotate(45)
+        trajectory.solve(solver='rk45', dt=0.01)
+        print(trajectory)
+        trajs.append(trajectory)
+    from Tracer.debug_tools import plot_trajectories
+    plot_trajectories(trajs)

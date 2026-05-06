@@ -56,7 +56,7 @@ class WindField:
         print("Synthesizing wind field with parameters: ", f"z_height={z_height}, direction={direction}, U_ref={U_ref}, z0={z0}, z_ref={z_ref}")
         # Needed for log profile, and for calculating tke and epsilon
         kappa = 0.4
-        Cmu = 0.09
+        Cmu = 0.03
         u_star = U_ref * kappa / np.log(z_ref / z0)
 
         if self.profile == "uniform":
@@ -70,8 +70,7 @@ class WindField:
         angle = np.radians(direction)
 
         tke = u_star**2 / np.sqrt(Cmu)
-        eps = Cmu**(3/4)*tke**(3/2) / (kappa * z)
-        eps = u_star**3 / (kappa * z)  # Simplified epsilon estimate based on u_star and height
+        eps = u_star**3 / (kappa * z) 
 
         self.ds = xr.Dataset(
             data_vars={
@@ -94,8 +93,8 @@ class WindField:
         ds['U'] *= scale_factor
         ds['V'] *= scale_factor
         ds['W'] *= scale_factor
-        ds['tke'] *= scale_factor
-        ds['epsilon'] *= scale_factor
+        ds['tke'] *= scale_factor**2
+        ds['epsilon'] *= scale_factor**3
         ds.attrs['scaling'] = scale_factor
         self.ds = ds
 
@@ -149,17 +148,17 @@ class WindField:
 if __name__ == "__main__":
     from Tracer import Trajectory
     # 1. Create a synthetic log profile
-    sim_field = WindField(profile="log", direction=0, U_ref=8, z_ref=90, z0=0.03)
+    sim_wind = WindField(profile="log", direction=0, U_ref=80, z_ref=90, z0=0.03)
 
     cond = {'ball_speed': 76.4, 'launch_angle': 10.4, 'spin_rate': 2545, 'spin_axis': 1.25}
 
-    traj = Trajectory(**cond, wind=sim_field)
-    traj.solve()
-    traj.plot()
+    # traj = Trajectory(**cond, wind=sim_wind)
+    # traj.solve()
+    # traj.plot()
 
     #3. Load from your Cartesian NetCDF
-    rans_wind = WindField(ds = '../RANS/nc files/flowdata_2m_cartesian.nc', profile='rans', U_ref=8)
-    traj = Trajectory(**cond, wind=rans_wind)
-    traj.solve()
-    traj.plot()
+    rans_wind = WindField(ds = '../RANS/nc files/flowdata_2m_cartesian.nc', profile='rans', U_ref=80)
+    # traj = Trajectory(**cond, wind=rans_wind)
+    # traj.solve()
+    # traj.plot()
     

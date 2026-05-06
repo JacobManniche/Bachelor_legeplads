@@ -1,11 +1,15 @@
 import numpy as np
 import plotly.graph_objects as go
 from Tracer.tracer import Trajectory
-from Tracer.windfield import WindField
 
-def animate(ball_speed, launch_angle, spin_rate, spin_axis=0, wind=WindField(profile='log'), dt=0.01):
+def animate(traj: Trajectory, dt=0.01):
+    """Animates the trajectory of the ball using Plotly. This function is optimized for performance by only updating the position of the ball marker in each frame, while keeping the full trajectory as a static background element.
+    Parameters:
+    - traj: A Trajectory object that has already been solved (i.e., traj.solve() has been called).
+    - dt: Time step for the animation frames (default: 0.01 seconds). Adjust this to speed up or slow down the animation.
+    """
 
-    t, p, v, w = Trajectory(ball_speed, launch_angle, spin_rate, spin_axis, wind=wind).solve(dt=dt)
+    t, p, v, w = traj.traj
     
     # 1. Pre-calculate indices to avoid repeated slicing
     step_size = max(1, len(p) // 100)
@@ -22,7 +26,7 @@ def animate(ball_speed, launch_angle, spin_rate, spin_axis=0, wind=WindField(pro
         hovertemplate=(
             "<b>Position:\t</b> %{x:.1f}m %{y:.1f}m %{z:.1f}m<br>" +
             "<b>Velocity:\t</b> %{customdata[0]:.1f}, %{customdata[1]:.1f}, %{customdata[2]:.1f} m/s<br>" +
-            "<b>Spin:\t</b> %{customdata[4]:.0f} rad/s<br>" +
+            "<b>Spin:\t</b> %{customdata[3]:.1f}, %{customdata[4]:.1f}, %{customdata[5]:.1f} rad/s<br>" +
             "<extra></extra>"    
             )
     )
@@ -113,4 +117,6 @@ if __name__ == "__main__":
     # This is where we will run our simulation and plot the results
     # We can change the initial conditions and parameters here to see how they affect the trajectory of the ball
     
-    animate(76.4, 10.4, -8545, dt=0.01)
+    traj = Trajectory(ball_speed=76.4, launch_angle=10.4, spin_rate=-8545)
+    traj.solve(solver='rk45', dt=0.01)
+    animate(traj, dt=0.01)
