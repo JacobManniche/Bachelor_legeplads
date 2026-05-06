@@ -18,6 +18,11 @@ from py_wake.examples.data.hornsrev1 import Hornsrev1Site
 from py_wake_ellipsys_examples.data.turbines.dummy_wt import Dummy
 from pyellipsys.inversemap import InverseMap
 
+def get_TI(z0):
+    kappa = 0.4
+    z_ref = 10.0
+    C_mu = 0.03
+    return (kappa * np.sqrt(2/3))/(C_mu**(0.25)*np.log((z_ref + z0)/z0))
 
 def main():
     # ---------------------------------------------------------------
@@ -35,7 +40,7 @@ def main():
     grid = FlatBoxGrid(Dref, 
                             cells1_D = cells1_D,
                             zFirstCell_D = zFirstCell / Dref, 
-                            z_cells1_D = 100,                   # number of cells in vertical direction in inner domain (default: cells1_D = z_cells1_D)
+                            z_cells1_D = 100,
                             zWakeEnd_D = 3.0,
                             bsize = 32,
                             zlen_D = zlen / Dref,
@@ -51,15 +56,17 @@ def main():
     wt = Dummy()
     wt_x = np.array([0.0]) 
     wt_y = np.array([0.0]) 
-    type_i = np.array([0])          
+    type_i = np.array([0])
 
-    hub_height = 90.0               # Hub height in meters
+    hub_height = 90.0
     h_i = np.array([hub_height])
 
-    wd = [270.0]                    # Wind direction in degrees (meteorological convention: 0 = from North, 90 = from East, etc.)
-    ws = [6.0]                      # Wind speed in m/s at reference height (zRef)
-    TI = 0.1                        # Turbulence intensity at reference height (zRef)
-    zRef = 10.0                     # Reference height for wind speed and turbulence intensity (m)
+    z0 = 0.003
+
+    wd = [270.0]
+    ws = [6.0]
+    TI = get_TI(z0)
+    zRef = 10.0
 
     # ---------------------------------------------------------------
     # 3. Setup Cluster and Flow Model
@@ -77,7 +84,7 @@ def main():
     # ---------------------------------------------------------------
     # 4. Run Simulation
     # ---------------------------------------------------------------
-    flowmodel.run_grid = True
+    flowmodel.run_grid = False
     flowmodel.run_cal = False # this is only relevant when simulating turbines
     flowmodel.run_wf = True
     flowmodel.run_post = True
