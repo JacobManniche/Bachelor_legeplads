@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 '''
 File name: visualize_dataset.py
 Author: Thomas Haas, KUL (thomas.haas@kuleuven.be)
@@ -14,6 +12,7 @@ Additional: Visualization functions of AWESCO Wind Field Datasets
 '''
 
 import h5py
+import xarray as xr
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -82,6 +81,26 @@ def get_volume(metadata, var, nt):
         field_3d = f[var][nt, :, :, :] 
     # Scale by utau and return in Z, Y, X order
     return field_3d * metadata['scaling']['utau']
+
+def import_as_xarray(metadata):
+    fname = metadata['fname']
+    with h5py.File(fname, 'r') as f:
+        # Create xarray DataArray with proper coordinates and dimensions
+        ds = xr.Dataset(
+            data_vars={
+                'u': (['t', 'z', 'y', 'x'], f['u'][:] * metadata['scaling']['utau']),  # Scale the data
+                'v': (['t', 'z', 'y', 'x'], f['v'][:] * metadata['scaling']['utau']),  # Scale the data
+                'w': (['t', 'z', 'y', 'x'], f['w'][:] * metadata['scaling']['utau']),  # Scale the data
+            },
+            coords={
+                'x': metadata['x'],
+                'y': metadata['y'],
+                'z': metadata['z'],
+                't': metadata['t']
+            },
+        )
+        f.close()
+    return ds
 
 def plot_plane(ax, u_slice, metadata, var, q, i_idx, ttl, um):
     # Create physical coordinate grids based on metadata
@@ -218,3 +237,12 @@ def plot_pod_modes(U_modes, Nz, Ny, Nx, modes_to_show=[0, 4, 9, 19, 29, 49, 79, 
     plt.suptitle(f"Top 9 POD Modes - Horizontal Slice at Z-Index {z_slice}", fontsize=16)
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.show()
+
+if __name__ == "__main__":
+    # Example usage
+    fname = 'golf_slice_c1.h5'
+    case = 'c1'
+    metadata = get_metadata(fname, case)
+    var = 'u'
+    nt = 0
+    ds = import_as_xarray(metadata)
