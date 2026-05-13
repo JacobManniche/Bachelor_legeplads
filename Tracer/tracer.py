@@ -1,5 +1,3 @@
-from typing_extensions import Final
-
 import numpy as np
 from Tracer.windfield import WindField
 from Tracer.solvers import solver_rk45, solver_euler
@@ -102,7 +100,7 @@ class Trajectory:
 
     def __repr__(self):
         if self.is_solved:
-            return f"Trajectory(ball_speed={self.args[0]}, launch_angle={self.args[1]}, spin_rate={self.args[2]}, spin_axis={self.args[3]}) \nV0={self.V0.round(2)}, \nW0={self.W0.round(2)}, \nP0={self.P0.round(2)}, \nFinal Position={self.p[-1].round(2)}, \Time={self.t[-1]:.2f} s"
+            return f"Trajectory(ball_speed={self.args[0]}, launch_angle={self.args[1]}, spin_rate={self.args[2]}, spin_axis={self.args[3]}) \nV0={self.V0.round(2)}, \nW0={self.W0.round(2)}, \nP0={self.P0.round(2)}, \nFinal Position={self.p[-1].round(2)}, \n Time={self.t[-1]:.2f} s"
         else:
             return f"Trajectory(V0={self.V0.round(2)}, W0={self.W0.round(2)}, P0={self.P0.round(2)})"
 

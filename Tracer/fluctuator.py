@@ -1,4 +1,3 @@
-from Tracer.windfield import WindField 
 import numpy as np
 
 def gust_simple(wind,tke,rng,cf=1):

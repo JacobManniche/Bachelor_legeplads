@@ -1,9 +1,16 @@
 import numpy as np
 import xarray as xr
-from scipy.interpolate import RegularGridInterpolator
+from scipy.interpolate import RegularGridInterpolator, interp1d
+import joblib
+import os
+    
+# Load the POD library once at module level
+script_dir = os.path.dirname(__file__)
+library_path = os.path.join(script_dir, 'pod_library.joblib')
+pod_lib = joblib.load(library_path)
 
 class WindField:
-    def __init__(self, profile="log", ds=None, **kwargs):
+    def __init__(self, profile="log", ds=None, fluctuation=False, **kwargs):
         """
         profile : str
             Type of wind field to create. Options: 'log', 'uniform', 'rans'.
@@ -28,6 +35,10 @@ class WindField:
             raise ValueError("Must provide a valid profile type and/or dataset.")
 
         self._setup_interpolators()
+
+        self.fluctuation = fluctuation
+        if fluctuation:
+            self._setup_fluctuation()
         
     def _setup_interpolators(self):
         if self.profile == 'uniform':
@@ -51,9 +62,14 @@ class WindField:
             fill_value=0 
         )
 
+    def _setup_fluctuation(self):
+        ran_n = np.random.choice(pod_lib['samples'], size=1)[0]
+        self.a = pod_lib['coeffs'](ran_n)
+        self.phi = pod_lib['modes'] # call input (z)
+
     def synthesize(self, z_height=100, direction=0, U_ref=10.0, z0=0.03, z_ref = 10.0):
         """Constructor for Log or Uniform profiles."""
-        print("Synthesizing wind field with parameters: ", f"z_height={z_height}, direction={direction}, U_ref={U_ref}, z0={z0}, z_ref={z_ref}")
+        print(f"Synthesizing wind field with parameters: z_height={z_height}, direction={direction}, U_ref={U_ref}, z0={z0}, z_ref={z_ref}")
         # Needed for log profile, and for calculating tke and epsilon
         kappa = 0.4
         Cmu = 0.03
@@ -98,51 +114,52 @@ class WindField:
         ds.attrs['scaling'] = scale_factor
         self.ds = ds
 
-    def get_profile_at(self, *args, **kwargs):
+    def get_profile_at(self, x=0, y=0, z=0):
         """
         Returns the full profile (velocity vector, tke, epsilon) at a given point.
-            - kwargs should be in the form of (x=..., y=..., z=...)
+
         """
-        if len(args) == 3: # assume arguments are x, y, z in order
-            kwargs = {'x': args[0], 'y': args[1], 'z': args[2]}
+        
         if self.profile == 'uniform':
-            return self._static_wind, self._static_tke, self._static_epsilon
+            u, tke, eps = self._static_wind, self._static_tke, self._static_epsilon
         
         elif self.profile == 'log':
-            result = self.interpolator([kwargs['z']])[0]
-            return result[:3], result[3], result[4]  # velocity, tke, epsilon
+            result = self.interpolator([z])[0]
+            u, tke, eps = result[:3], result[3], result[4]  # velocity, tke, epsilon
 
         elif self.profile == 'rans':
-            result = self.interpolator([kwargs['x'], kwargs['y'], kwargs['z']])[0]
-            return result[:3], result[3], result[4]  # velocity, tke, epsilon
+            result = self.interpolator([x, y, z])[0]
+            u, tke, eps = result[:3], result[3], result[4]  # velocity, tke, epsilon
 
-    def get_velocity_at(self, *args, **kwargs):
-        """
-        Interpolates the wind field at an arbitrary spatial point.
-        Returns a np.array with velocity vector (u,v,w).
-            - kwargs should be in the form of (x=..., y=..., z=...)
-        """
-        return self.get_profile_at(*args, **kwargs)[0] # just call the full profile method since it returns all the info we need
+        if self.fluctuation: # add fluctuations if enabled
+            u += self.get_fluctuations_at(z, tke)
+        
+        return u, tke, eps
+
+    def get_velocity_at(self, x=0, y=0, z=0):
+        return self.get_profile_at(x, y, z)[0] # just call the full profile method since it returns all the info we need
     
-    def get_tke_at(self, *args, **kwargs):
-        """
-        Interpolates the turbulent kinetic energy at an arbitrary spatial point.
-        Returns a np.array with tke.
-            - kwargs should be in the form of (x=..., y=..., z=...)
-        """
-        return self.get_profile_at(*args, **kwargs)[1] # just call the full profile method since it returns all the info we need
+    def get_tke_at(self, x=0, y=0, z=0):
+        return self.get_profile_at(x, y, z)[1] # just call the full profile method since it returns all the info we need
 
-    def get_epsilon_at(self, *args, **kwargs):
+    def get_epsilon_at(self, x=0, y=0, z=0):
+        return self.get_profile_at(x, y, z)[2] # just call the full profile method since it returns all the info we need
+
+    def get_fluctuations_at(self, z, tke_rans):
         """
-        Interpolates the turbulent dissipation rate at an arbitrary spatial point.
-        Returns a np.array with epsilon.
-            - kwargs should be in the form of (x=..., y=..., z=...)
+        Synthesizes the scaled fluctuation component at an arbitrary spatial point.
+        Returns a np.array with velocity fluctuations (u', v', w').
         """
-        return self.get_profile_at(*args, **kwargs)[2] # just call the full profile method since it returns all the info we need
-            
+        # Synthesize fluctuations using the POD modes and coefficients
+        fluctuation = self.a @ self.phi(z)  # This is a simplified representation
+        tke_pod = 0.5 * (fluctuation[0]**2 + fluctuation[1]**2 + fluctuation[2]**2)
+        gamma = np.sqrt(tke_rans / tke_pod) if tke_pod > 0 else 0
+        fluctuation *= gamma  # Scale fluctuations to match RANS tke
+        return fluctuation
+    
     def __repr__(self):
         # Simple representation showing profile type and dataset summary
-        return f"WindField(profile={self.profile}) \n{self.ds})".replace('<xarray.Dataset> ', '')
+        return f"WindField(profile={self.profile}, fluctuation={self.fluctuation}) \n{self.ds})".replace('<xarray.Dataset> ', '')
 
 # --- Usage Example ---
 if __name__ == "__main__":
