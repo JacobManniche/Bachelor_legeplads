@@ -1,4 +1,5 @@
 from Tracer.windfield import WindField
+from Tracer.fluctuator import Fluctuator
 import numpy as np
 from scipy.integrate import solve_ivp
 
@@ -69,7 +70,7 @@ def coefficients(v, w):
 
 
 
-def odesystem(t, y, W_initial, wind: WindField, decay_rate):
+def odesystem(t, y, W_initial, wind: WindField, fluc: Fluctuator, decay_rate):
     # Unpack the state
     p = y[:3]
     v = y[3:]
@@ -78,10 +79,16 @@ def odesystem(t, y, W_initial, wind: WindField, decay_rate):
     w = W_initial * np.exp(-decay_rate * t)
     
     # Get Acceleration
-    wind_vec = wind.get_velocity_at(x=p[0], y=p[1], z=p[2])  # Get local wind velocity vector
+    wind_vec, tke, eps = wind.get_profile_at(*p)  # Get local wind velocity vector
+
     if np.isnan(wind_vec).any():
         print(f"Warning: NaN in wind at position {p.round(3)}. Setting wind to zero.")
         wind_vec = np.zeros(3)  # Fallback to zero wind if interpolation fails
+
+    if fluc:
+        fluctuation = fluc.get_fluctuation_at(pos=p, tke=tke, epsilon=eps)  # Get turbulence fluctuation vector
+        wind_vec += fluctuation  # Add turbulence to the wind vector
+
     a = acc(v, w, wind_vec)
     
     return np.concatenate([v, a])
@@ -93,7 +100,7 @@ def hit_ground(t, y, *args):
 hit_ground.terminal = True
 hit_ground.direction = -1
 
-def solver_rk45(V0, W0, P0, wind: WindField, dt=0.05, decay_rate=0.05, mt=15, rtol=1e-6):
+def solver_rk45(V0, W0, P0, wind: WindField, fluc: Fluctuator=None, dt=0.05, decay_rate=0.05, mt=15, rtol=1e-6):
     """
     Solves the equations of motion for the ball given the initial conditions and parameters using the RK45 method.
     It will return the trajectory of the ball as a function of time.
@@ -102,6 +109,7 @@ def solver_rk45(V0, W0, P0, wind: WindField, dt=0.05, decay_rate=0.05, mt=15, rt
     - W0: Initial spin vector (rad/s)
     - P0: Initial position vector (m)
     - wind: WindField object that provides the get_velocity_at(x, y, z) method
+    - fluc: Fluctuator object that provides the get_fluctuation_at(pos, tke, epsilon) method
     - dt: Time step for the solver (used for t_eval, can be set to None for adaptive time steps)
     - decay_rate: Decay rate for spin (default: 0.05)
     - mt: Max time for the solver to run (default: 15 seconds)
@@ -123,7 +131,7 @@ def solver_rk45(V0, W0, P0, wind: WindField, dt=0.05, decay_rate=0.05, mt=15, rt
         t_span=(0, mt),       # Max time 15 seconds
         y0=y0, 
         method='RK45',        # Dormand-Prince adaptive solver
-        args=(W0, wind, decay_rate),
+        args=(W0, wind, fluc, decay_rate),
         events=hit_ground,    # Stops the moment Z hits 0
         t_eval=t_requested,
         rtol=rtol, atol=rtol/1000  # Precision settings
@@ -137,7 +145,7 @@ def solver_rk45(V0, W0, P0, wind: WindField, dt=0.05, decay_rate=0.05, mt=15, rt
 
     return t_steps, positions, velocities, spin_rates
 
-def solver_euler(V0, W0, P0, wind: WindField, dt=0.01, decay_rate=0.05):
+def solver_euler(V0, W0, P0, wind: WindField, fluc: Fluctuator=None, dt=0.01, decay_rate=0.05):
     # This function will solve the equations of motion for the ball given the initial conditions and parameters
     # It will return the trajectory of the ball as a function of time
     t = [0]
@@ -148,10 +156,16 @@ def solver_euler(V0, W0, P0, wind: WindField, dt=0.01, decay_rate=0.05):
     while P[-1][2] >= 0: # while the ball is above the ground
         
         p = P[-1]
-        wind_vec = wind.get_velocity_at(x=p[0], y=p[1], z=p[2])  # Get local wind velocity vector
+        wind_vec, tke, eps = wind.get_profile_at(*p)  # Get local wind velocity vector
+        
         if np.isnan(wind_vec).any():
             print(f"Warning: NaN in wind at position {p.round(3)}. Setting wind to zero.")
             wind_vec = np.zeros(3)  # Fallback to zero wind if interpolation fails
+        
+        if fluc:
+            fluctuation = fluc.get_fluctuation_at(pos=p, tke=tke, epsilon=eps)  # Get turbulence fluctuation vector
+            wind_vec += fluctuation  # Add turbulence to the wind vector
+
         a = acc(V[-1], W[-1], wind_vec)
 
         V.append(V[-1] + a * dt) # velocity
@@ -166,7 +180,7 @@ if __name__ == "__main__":
     from Tracer import initial_spin_rate, initial_velocity
     from Tracer.debug_tools import plot_trajectories
     # Example usage
-    P0 = np.array([-200, 0, 0])  # Initial position
+    P0 = np.array([-20, 0, 0])  # Initial position
     V0 = initial_velocity(speed=76.44384, angle=10.4)  # Initial velocity vector
     W0 = initial_spin_rate(spin_rate=2545, spin_axis=1.25)  # Initial spin vector
     wind_synt = WindField(profile='log', direction=0, U_ref=8, z_ref=90, z0=0.03)
