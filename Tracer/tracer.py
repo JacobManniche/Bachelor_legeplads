@@ -15,11 +15,11 @@ def initial_spin_rate(spin_rate, spin_axis=0):
     w_mag = spin_rate * (2 * np.pi / 60)
     
     # For X-axis flight; X: rifle, Y: Backspin, Z: Sidespin 
-    w0 = w_mag *np.array([0,-np.cos(phi), np.sin(phi)])
+    w0 = w_mag * np.array([0,-np.cos(phi), np.sin(phi)])
 
     return w0
 class Trajectory:
-    def __init__(self, ball_speed, launch_angle, spin_rate, spin_axis=0, orientation=0, P0=np.array([0, 0, 0]), wind=None):
+    def __init__(self, ball_speed, launch_angle, spin_rate, spin_axis=0, orientation=0, P0=np.array([0, 0, 0]), wind=None, fluc=None):
         """
         Initializes the Trajectory object with initial conditions and wind field.
         Parameters:
@@ -30,6 +30,7 @@ class Trajectory:
         - P0: Initial position vector (m)
         - orientation: Orientation angle in degrees (default: 0)
         - wind: WindField object that provides the get_velocity_at(x, y, z)
+        - fluc: Fluctuator object that provides the get_fluctuation_at(pos, tke, epsilon) method
         """
         self.args = (ball_speed, launch_angle, spin_rate, spin_axis, orientation)
         self.P0 = P0
@@ -41,6 +42,7 @@ class Trajectory:
             print("No wind provided. Using default uniform wind with U_ref=0.")
             wind = WindField(profile='uniform', U_ref=0)
         self.wind = wind
+        self.fluc = fluc
 
         self.is_solved = False
 
@@ -74,9 +76,11 @@ class Trajectory:
         - w: Array of spin rates at each time step
         """
         if solver == 'rk45':
-            t, p, v, w = solver_rk45(self.V0, self.W0, P0=self.P0, wind=self.wind, dt=dt, **kwargs)
+            if self.fluc and self.fluc.method in ['ou', 'langevin', 'simple']:
+                raise ValueError("RK45 solver is not compatible with temporal stochastic turbulence methods (OU, Langevin, simple). Please use 'euler' solver for these methods.")
+            t, p, v, w = solver_rk45(self.V0, self.W0, P0=self.P0, wind=self.wind, fluc=self.fluc, dt=dt, **kwargs)
         elif solver == 'euler':
-            t, p, v, w = solver_euler(self.V0, self.W0, P0=self.P0, wind=self.wind, dt=dt, **kwargs)
+            t, p, v, w = solver_euler(self.V0, self.W0, P0=self.P0, wind=self.wind, fluc=self.fluc, dt=dt, **kwargs)
         else:
             raise ValueError("Invalid solver specified. Use 'rk45' or 'euler'.")
         
@@ -106,17 +110,24 @@ class Trajectory:
 
 
 if __name__ == "__main__":
+    from Tracer.fluctuator import Fluctuator
     # Example usage
-    # file = '/Users/eskefr/Library/CloudStorage/OneDrive-DanmarksTekniskeUniversitet/6. semester/Bachelor/Github/Bachelor_legeplads/RANS/nc files/flowdata_2m_cartesian.nc'
-    # wind = WindField(profile='rans', ds=file)
-    wind = WindField(profile='uniform', U_ref=10, direction=45)
-    trajectory = Trajectory(ball_speed=76.44384, launch_angle=10.4, spin_rate=2545, spin_axis=0, wind=wind)
-    trajectory.solve(solver='rk45', dt=0.01)
-    trajs = [trajectory]
-    for a in range(7):
-        trajectory.rotate(45)
-        trajectory.solve(solver='rk45', dt=0.01)
-        print(trajectory)
-        trajs.append(trajectory)
-    from Tracer.debug_tools import plot_trajectories
-    plot_trajectories(trajs)
+    wind = WindField(profile='log', U_ref=8, z_ref=10, z0=0.03, direction=45)
+
+    landing_points = {method: [] for method in ['simple', 'Langevin', 'POD']}
+
+    for method in ['simple', 'Langevin', 'POD']:
+        for i in range(10):
+            fluc = Fluctuator(method=method, dt=0.01, C0=2.1, cf=1.0)
+            traj = Trajectory(
+                ball_speed=76, 
+                launch_angle=13, 
+                spin_rate=2500,
+                wind=wind,
+                fluc=fluc
+            )
+            if method in ['Langevin', 'simple']:
+                traj.solve(solver='euler')
+            else:
+                traj.solve('rk45')
+            landing_points[method].append(traj.p[-1][:2])
