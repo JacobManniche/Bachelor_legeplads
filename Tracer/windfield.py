@@ -51,7 +51,7 @@ class WindField:
             fill_value=0 
         )
 
-    def synthesize(self, z_height=100, direction=0, U_ref=10.0, z0=0.03, z_ref = 10.0):
+    def synthesize(self, z_height=100, direction=0, U_ref=6.0, z0=0.03, z_ref = 10.0):
         """Constructor for Log or Uniform profiles."""
         print(f"Synthesizing wind field with parameters: z_height={z_height}, direction={direction}, U_ref={U_ref}, z0={z0}, z_ref={z_ref}")
         # Needed for log profile, and for calculating tke and epsilon
