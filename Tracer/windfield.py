@@ -11,7 +11,7 @@ class WindField:
             RANS dataset containing coordinates 'x', 'y', 'z'
             and variables 'U', 'V', 'W', 'tke'.
         kwargs : dict
-            Additional parameters for synthetic profiles (direction, U_ref, z0)
+            Additional parameters for synthetic profiles (direction, U_ref, z0, feedback)
         """
 
         # make sure profile is lowercase for consistency
@@ -51,9 +51,12 @@ class WindField:
             fill_value=0 
         )
 
-    def synthesize(self, z_height=100, direction=0, U_ref=6.0, z0=0.03, z_ref = 10.0):
+    def synthesize(self, z_height=100, direction=0, U_ref=6.0, z0=0.03, z_ref = 10.0, feedback=False):
         """Constructor for Log or Uniform profiles."""
-        print(f"Synthesizing wind field with parameters: z_height={z_height}, direction={direction}, U_ref={U_ref}, z0={z0}, z_ref={z_ref}")
+        
+        if feedback:
+            print(f"Synthesizing wind field with parameters: z_height={z_height}, direction={direction}, U_ref={U_ref}, z0={z0}, z_ref={z_ref}")
+
         # Needed for log profile, and for calculating tke and epsilon
         kappa = 0.4
         Cmu = 0.03
