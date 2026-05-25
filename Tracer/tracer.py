@@ -77,7 +77,7 @@ class Trajectory:
         """
         if solver == 'rk45':
             if self.fluc and self.fluc.method in ['ou', 'langevin', 'simple']:
-                raise ValueError("RK45 solver is not compatible with temporal stochastic turbulence methods (OU, Langevin, simple). Please use 'euler' solver for these methods.")
+                raise ValueError("RK45 solver is not compatible with temporal stochastic turbulence methods (OU, Langevin, Simple). Please use 'euler' solver for these methods.")
             t, p, v, w = solver_rk45(self.V0, self.W0, P0=self.P0, wind=self.wind, fluc=self.fluc, dt=dt, **kwargs)
         elif solver == 'euler':
             t, p, v, w = solver_euler(self.V0, self.W0, P0=self.P0, wind=self.wind, fluc=self.fluc, dt=dt, **kwargs)

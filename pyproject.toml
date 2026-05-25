@@ -4,7 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "Tracer"
-version = "0.1.1"
+version = "0.1.2"
+dependencies = [
+    "numpy",
+    "scipy",
+    "plotly",
+    "joblib",
+    "xarray",
+]
 
 [tool.setuptools.packages.find]
 include = ["Tracer*"]
