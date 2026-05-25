@@ -122,42 +122,45 @@ class Fluctuator:
 
         return fluctuation * self.cf
     
-    def plot_fluctuation(self, range=(0, 100), num_points=100, tke=1.0, epsilon=1.0, ax=None):
+    def plot(self, range=(0, 100), num_points=100, tke=1.0, epsilon=1.0, ax=None):
         """
         Utility function to visualize the fluctuation profile for constant TKE.
         if method is POD, it will show the fluctuation profile across the specified z range.
         if method is simple, OU, or Langevin, it will show the fluctuation profile across the specified time range.
         """
         import matplotlib.pyplot as plt
-        plt.figure(figsize=(10, 6))
+        
+        # Create figure and axes if not provided
+        if not ax:
+            fig, ax = plt.subplots(figsize=(10, 6))
+        
         values = np.linspace(range[0], range[1], num_points)
         if self.method == 'pod':
             fluctuations = np.array([self._gust_POD(tke, z) for z in values])  # Use tke=1.0 for visualization
-            plt.plot(fluctuations[:, 0], values, label="u' (x-fluctuation)")
-            plt.plot(fluctuations[:, 1], values, label="v' (y-fluctuation)")
-            plt.plot(fluctuations[:, 2], values, label="w' (z-fluctuation)")
-            plt.ylabel('Height (z)')
-            plt.xlabel('Fluctuation')
+            ax.plot(fluctuations[:, 0], values, label="u' (x-fluctuation)")
+            ax.plot(fluctuations[:, 1], values, label="v' (y-fluctuation)")
+            ax.plot(fluctuations[:, 2], values, label="w' (z-fluctuation)")
+            ax.set_ylabel('Height (z)')
+            ax.set_xlabel('Fluctuation')
         elif self.method in ['simple', 'ou', 'langevin']:
             fluctuations = np.array([self.get_fluctuation_at((0, 0, 0), tke=tke, epsilon=epsilon) for t in values])  # Use tke=1.0 for visualization
-            plt.plot(values, fluctuations[:, 0], label="u' (x-fluctuation)")
-            plt.plot(values, fluctuations[:, 1], label="v' (y-fluctuation)")
-            plt.plot(values, fluctuations[:, 2], label="w' (z-fluctuation)")
-            plt.xlabel('Time')
-            plt.ylabel('Fluctuation')
-        plt.legend()
-        plt.grid()
-        plt.show()
+            ax.plot(values, fluctuations[:, 0], label="u' (x-fluctuation)")
+            ax.plot(values, fluctuations[:, 1], label="v' (y-fluctuation)")
+            ax.plot(values, fluctuations[:, 2], label="w' (z-fluctuation)")
+            ax.set_xlabel('Time')
+            ax.set_ylabel('Fluctuation')
+        ax.legend()
+        ax.grid()
+
+        if not ax:
+            plt.show()
 
 if __name__ == "__main__":
+    import matplotlib.pyplot as plt
     # Example usage
     fluc = Fluctuator(method='pod')
-    fluc.plot_fluctuation(range=(0, 100), num_points=200, tke=10)
-    fluc = Fluctuator(method='pod', n_modes=5)
-    fluc.plot_fluctuation(range=(0, 100), num_points=200, tke=10)
-    fluc = Fluctuator(method='pod', n_modes=13)
-    fluc.plot_fluctuation(range=(0, 100), num_points=200, tke=10)
-    fluc_simple = Fluctuator(method='simple')
-    fluc_simple.plot_fluctuation(range=(0, 15), num_points=60, tke=10)
-    fluc_lan = Fluctuator(method='langevin')
-    fluc_lan.plot_fluctuation(range=(0, 15), num_points=60, tke=10)
+    fluc.plot(range=(0, 100), num_points=200, tke=10)
+
+    fig, ax = plt.subplots(2, 1, figsize=(10, 6))
+    fluc_ou = Fluctuator(method='OU', dt=0.01, Tg=0.1)
+    fluc_ou.plot(range=(0, 100), num_points=200, tke=10, ax=ax[0])
