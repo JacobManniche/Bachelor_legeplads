@@ -111,7 +111,6 @@ class Fluctuator:
         
         return fluctuation * self.cf
 
-
     def _gust_POD(self, tke, z):
         """POD-based fluctuation model."""
         sigma_target = np.sqrt(tke * (2.0/3.0) * self.gamma[:self.n_modes])  # Target std for each mode based on TKE and mode energy fraction
