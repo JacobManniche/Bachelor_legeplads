@@ -18,14 +18,13 @@ class Fluctuator:
     State is maintained internally for time-dependent methods (OU, Langevin).
     """
     
-    def __init__(self, method, cf=1.0, dt=0.01, C0=2.1, Tg=0.1, n_modes=1, seed=None):
+    def __init__(self, method, cf=1.0, C0=2.1, Tg=0.1, n_modes=1, seed=None):
         """
         Initialize the Fluctuator.
         
         Args:
             method: 'simple', 'OU' (Ornstein-Uhlenbeck), 'Langevin', or 'POD'
             cf: Correction factor for fluctuation scaling
-            dt: Time step for stateful methods (OU, Langevin)
             C0: Engineering constant for Langevin model
             Tg: Characteristic time scale for OU model
             n_modes: Number of POD modes to use (only for 'POD' method)
@@ -37,7 +36,6 @@ class Fluctuator:
 
         self.method = method
         self.cf = cf
-        self.dt = dt
         self.C0 = C0
         self.Tg = Tg
         self.seed = seed
@@ -55,7 +53,7 @@ class Fluctuator:
             self.phi = pod_lib['modes']
             self.gamma = pod_lib['gamma']
     
-    def get_fluctuation_at(self, pos, tke, epsilon=None):
+    def get_fluctuation_at(self, pos, tke, epsilon=None, dt=None):
         """
         Get fluctuation at a specific location and time.
         
@@ -66,7 +64,8 @@ class Fluctuator:
             time: Current time
             tke: Turbulent kinetic energy
             epsilon: Dissipation rate (required for Langevin method)
-        
+            dt: Time step (required for OU and Langevin methods)
+
         Returns:
             Fluctuation vector [u', v', w'] as np.ndarray
         """
@@ -75,20 +74,20 @@ class Fluctuator:
             return self._fluctuation_simple(tke)
         
         elif self.method == 'ou':
-            gust_old = self._last_fluctuation  # Get previous gust or initialize to zero
-            gust_new = self._gust_OU(tke, gust_old)
-            self._last_fluctuation = gust_new  # Update state
-            return gust_new
+            fluctuation_old = self._last_fluctuation  # Get previous gust or initialize to zero
+            fluctuation_new = self._fluctuation_OU(tke, fluctuation_old, dt)
+            self._last_fluctuation = fluctuation_new  # Update state
+            return fluctuation_new
         
         elif self.method == 'langevin':
-            gust_old = self._last_fluctuation  # Get previous gust or initialize to zero
-            gust_new = self._gust_Langevin(tke, epsilon, gust_old)
-            self._last_fluctuation = gust_new  # Update state
-            return gust_new
+            fluctuation_old = self._last_fluctuation  # Get previous gust or initialize to zero
+            fluctuation_new = self._fluctuation_Langevin(tke, epsilon, fluctuation_old, dt)
+            self._last_fluctuation = fluctuation_new  # Update state
+            return fluctuation_new
         
         elif self.method == 'pod':
             z = pos[2]  # Assuming z is the vertical coordinate
-            return self._gust_POD(tke, z)        
+            return self._fluctuation_POD(tke, z)        
         
     def _fluctuation_simple(self, tke):
         """Simple white noise fluctuation model."""
@@ -96,22 +95,22 @@ class Fluctuator:
         fluctuation = self.rng.normal(0.0, sigma, size=3)          # draw three random numbers
         return fluctuation * self.cf
 
-    def _gust_OU(self, tke, gust_old):
+    def _fluctuation_OU(self, tke, fluctuation_old, dt):
         """Ornstein-Uhlenbeck inspired fluctuation model."""
         sigma = np.sqrt(tke * (2.0/3.0))                                            # std of turbulent kinetic energy
         eta = self.rng.normal(0.0, 1.0, size=3)                                          # draw three random numbers
-        fluctuation = gust_old*(1.0 - self.dt/self.Tg) + np.sqrt(2.0*sigma**2*self.dt/self.Tg) * eta    # new gust = decaying previous gust term + new random component
+        fluctuation = fluctuation_old*(1.0 - dt/self.Tg) + np.sqrt(2.0*sigma**2*dt/self.Tg) * eta    # new gust = decaying previous gust term + new random component
         return fluctuation * self.cf
 
-    def _gust_Langevin(self, tke, epsilon, gust_old):
+    def _fluctuation_Langevin(self, tke, epsilon, fluctuation_old, dt):
         """Langevin implementation of fluctuation model."""
         gamma = (3.0/4.0) * self.C0 * (epsilon/tke) if tke > 0 else 0                   # decay term based on engineering factor C0, tke, and epsilon
         eta = self.rng.normal(0.0, 1.0, size=3)                                          # random number draw 
-        fluctuation = gust_old * (1.0 - gamma * self.dt) + np.sqrt(self.C0 * epsilon * self.dt) * eta     
+        fluctuation = fluctuation_old * (1.0 - gamma * dt) + np.sqrt(self.C0 * epsilon * dt) * eta     
         
         return fluctuation * self.cf
 
-    def _gust_POD(self, tke, z):
+    def _fluctuation_POD(self, tke, z):
         """POD-based fluctuation model."""
         sigma_target = np.sqrt(tke * (2.0/3.0) * self.gamma[:self.n_modes])  # Target std for each mode based on TKE and mode energy fraction
         a_local = self.a * sigma_target  # Scale random coefficients to match target TKE distribution across modes
@@ -136,14 +135,14 @@ class Fluctuator:
         
         values = np.linspace(range[0], range[1], num_points)
         if self.method == 'pod':
-            fluctuations = np.array([self._gust_POD(tke, z) for z in values])  # Use tke=1.0 for visualization
+            fluctuations = np.array([self._fluctuation_POD(tke, z) for z in values])  # Use tke=1.0 for visualization
             ax.plot(fluctuations[:, 0], values, label="u' (x-fluctuation)")
             ax.plot(fluctuations[:, 1], values, label="v' (y-fluctuation)")
             ax.plot(fluctuations[:, 2], values, label="w' (z-fluctuation)")
             ax.set_ylabel('Height (z)')
             ax.set_xlabel('Fluctuation')
         elif self.method in ['simple', 'ou', 'langevin']:
-            fluctuations = np.array([self.get_fluctuation_at((0, 0, 0), tke=tke, epsilon=epsilon) for t in values])  # Use tke=1.0 for visualization
+            fluctuations = np.array([self.get_fluctuation_at((0, 0, 0), tke=tke, epsilon=epsilon, dt=values[1]) for t in values])  # Use tke=1.0 for visualization
             ax.plot(values, fluctuations[:, 0], label="u' (x-fluctuation)")
             ax.plot(values, fluctuations[:, 1], label="v' (y-fluctuation)")
             ax.plot(values, fluctuations[:, 2], label="w' (z-fluctuation)")
