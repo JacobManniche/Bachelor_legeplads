@@ -163,7 +163,7 @@ def solver_euler(V0, W0, P0, wind: WindField, fluc: Fluctuator=None, dt=0.01, de
             wind_vec = np.zeros(3)  # Fallback to zero wind if interpolation fails
         
         if fluc:
-            fluctuation = fluc.get_fluctuation_at(pos=p, tke=tke, epsilon=eps)  # Get turbulence fluctuation vector
+            fluctuation = fluc.get_fluctuation_at(pos=p, tke=tke, epsilon=eps, dt=dt)  # Get turbulence fluctuation vector
             wind_vec += fluctuation  # Add turbulence to the wind vector
 
         a = acc(V[-1], W[-1], wind_vec)
