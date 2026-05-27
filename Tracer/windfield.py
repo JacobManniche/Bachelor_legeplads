@@ -60,14 +60,16 @@ class WindField:
         # Needed for log profile, and for calculating tke and epsilon
         kappa = 0.4
         Cmu = 0.03
-        u_star = U_ref * kappa / np.log(z_ref / z0)
+        #u_star = U_ref * kappa / np.log(z_ref / z0) # old version, fits with theory
+        u_star = U_ref * kappa / np.log((z_ref + z0) / z0)  # new version, fits with PyWakeEllipSys 
 
         if self.profile == "uniform":
             z = np.array([z_ref])
             z_mag = np.array([U_ref])
         elif self.profile == "log":
             z = np.logspace(-1, np.log10(z_height), num=z_height)
-            z_mag = u_star/kappa * np.log(z / z0)
+           #z_mag = u_star/kappa * np.log(z / z0) # old version, fits with theory 
+            z_mag = u_star/kappa * np.log((z + z0) / z0) # new version, used by PyWakeEllipSys as inflow condition
 
         
         angle = np.radians(direction)
