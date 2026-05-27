@@ -108,6 +108,67 @@ class Trajectory:
         else:
             return f"Trajectory(V0={self.V0.round(2)}, W0={self.W0.round(2)}, P0={self.P0.round(2)})"
 
+from typing import Literal
+
+# Define the allowed clubs for IDE autocomplete suggestions
+# (Note: "3 Iron" removed as it is only present in PGA, not LPGA)
+Clubs = Literal["Driver", "3-wood", "5-wood", "Hybrid", "4 Iron", "5 Iron", "6 Iron", "7 Iron", "8 Iron", "9 Iron", "PW"]
+
+# Dict format narrowed down to strictly: [Ball Speed (mph), Launch Angle (deg), Spin Rate (rpm)]
+pga_data = {
+    "Driver": [171, 10.4, 2545],
+    "3-wood": [162, 9.3, 3663],
+    "5-wood": [156, 9.7, 4322],
+    "Hybrid": [149, 10.2, 4587],
+    "3 Iron": [145, 10.3, 4404], # Unique to PGA list
+    "4 Iron": [140, 10.8, 4782],
+    "5 Iron": [135, 11.9, 5280],
+    "6 Iron": [130, 14.0, 6204],
+    "7 Iron": [123, 16.1, 7124],
+    "8 Iron": [118, 17.8, 8078],
+    "9 Iron": [112, 20.0, 8793],
+    "PW":     [104, 23.7, 9316]
+}
+
+lpga_data = {
+    "Driver": [143, 12.6, 2506],
+    "3-wood": [135, 11.6, 2595],
+    "5-wood": [130, 12.3, 4320],
+    "Hybrid": [125, 13.9, 4504],
+    "4 Iron": [118, 13.9, 4608],
+    "5 Iron": [114, 14.6, 4966],
+    "6 Iron": [111, 16.7, 5904],
+    "7 Iron": [106, 18.5, 6630],
+    "8 Iron": [102, 20.8, 7413],
+    "9 Iron": [95,  23.5, 7605],
+    "PW":     [88,  25.2, 8465]
+}
+
+
+class PGA(Trajectory):
+    def __init__(
+        self, 
+        club: Clubs, 
+        l: bool = False, 
+        spin_axis: float = 0, 
+        orientation: float = 0, 
+        P0: np.ndarray = np.array([0, 0, 0]), 
+        wind=None, 
+        fluc=None
+    ):
+        self.club = club
+        self.data = pga_data[club] if not l else lpga_data[club]
+        
+        super().__init__(
+            ball_speed=self.data[0],
+            launch_angle=self.data[1],
+            spin_rate=self.data[2],
+            spin_axis=spin_axis,
+            orientation=orientation,
+            P0=P0,
+            wind=wind,
+            fluc=fluc
+        )
 
 if __name__ == "__main__":
     from Tracer.fluctuator import Fluctuator
@@ -118,7 +179,7 @@ if __name__ == "__main__":
 
     for method in ['simple', 'Langevin', 'POD']:
         for i in range(10):
-            fluc = Fluctuator(method=method, dt=0.01, C0=2.1, cf=1.0)
+            fluc = Fluctuator(method=method, C0=2.1, cf=1.0)
             traj = Trajectory(
                 ball_speed=76, 
                 launch_angle=13, 

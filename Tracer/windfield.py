@@ -88,7 +88,7 @@ class WindField:
             coords={'z': z}
         )
 
-    def from_rans(self, path_or_ds, scale_factor=8):
+    def from_rans(self, path_or_ds, scale_factor=6.0):
         """Constructor for existing Cartesian RANS NetCDF files."""
         if isinstance(path_or_ds, str):
             ds = xr.open_dataset(path_or_ds)
